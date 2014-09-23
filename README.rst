@@ -1,8 +1,8 @@
 memgraphinator
 ==============
 
-I want a simple GUI tool to watch the memory usage of a given process and show
-me a nice real-time graph of it.
+I want a tool to draw the memory usage graph of a given process over time.
+I want to *see* memory leaks.
 
 I couldn't find one so I started writing my own.
 
@@ -10,6 +10,10 @@ I couldn't find one so I started writing my own.
 
 Currently it shows the memory usage for the last 30 seconds.  Resize the window
 to see more or less.
+
+Usage::
+
+    ./memgraphinator.py pid
 
 
 Requirements
@@ -20,3 +24,13 @@ Requirements
 - PyGObject with GIR libraries for Gtk etc.
 
 - Linux (for /proc/{pid}/status)
+
+
+Future plans
+------------
+
+- Show current and peak memory usage numbers below the graph
+- Show process name and command-line arguments above the graph
+- Changeable zoom level (1px = 0.1s, 1s, 10s, entire graph)
+- Process picker in the GUI
+- Ability to watch multiple processes simultaneously
