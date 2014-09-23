@@ -48,12 +48,13 @@ class Graph(Gtk.DrawingArea):
         if not n:
             return
 
+        # approach 1: draw the graph from left to right, squeezing it when it no longer fits
         scale = max(self.data)
         if n > w:
             dx = float(w - 1) / (n - 1)
         else:
             dx = 1
-        dy = float(h) / scale
+        dy = float(max(1, h - 10)) / scale
         points = self._points(0, h, dx, -dy)
 
         # color stolen from virt-manager
