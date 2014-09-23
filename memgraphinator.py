@@ -3,7 +3,7 @@ import sys
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, GLib, Gdk, Gio, Gtk, Pango
+from gi.repository import GObject, Gtk
 
 
 if len(sys.argv) < 2:

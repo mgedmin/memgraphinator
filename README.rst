@@ -10,3 +10,13 @@ I couldn't find one so I started writing my own.
 
 Currently it shows the memory usage for the last 30 seconds.  Resize the window
 to see more or less.
+
+
+Requirements
+------------
+
+- Python
+
+- PyGObject with GIR libraries for Gtk etc.
+
+- Linux (for /proc/{pid}/status)
