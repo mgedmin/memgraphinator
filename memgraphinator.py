@@ -48,14 +48,12 @@ class Graph(Gtk.DrawingArea):
         if not n:
             return
 
-        # approach 1: draw the graph from left to right, squeezing it when it no longer fits
+        # approach 2: draw the graph from right to left, discarding data if it no longer fits
         scale = max(self.data)
-        if n > w:
-            dx = float(w - 1) / (n - 1)
-        else:
-            dx = 1
+        dx = 1
         dy = float(max(1, h - 10)) / scale
-        points = self._points(0, h, dx, -dy)
+        n = min(len(self.data), w)
+        points = self._points(w - n, h, dx, -dy, slice(-n, None))
 
         # color stolen from virt-manager
         cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
@@ -66,14 +64,14 @@ class Graph(Gtk.DrawingArea):
         cr.set_source_rgba(0.71484375, 0.84765625, 0.89453125, .5)
         self._line(cr, points)
         cr.line_to(points[-1][0], h)
-        cr.line_to(0, h)
+        cr.line_to(points[0][0], h)
         cr.fill()
 
         cr.restore()
 
-    def _points(self, x0, y0, dx, dy):
+    def _points(self, x0, y0, dx, dy, slice=slice(None)):
         pts = []
-        for i, pt in enumerate(self.data):
+        for i, pt in enumerate(self.data[slice]):
             pts.append((x0 + i * dx, y0 + pt * dy))
         return pts
 
