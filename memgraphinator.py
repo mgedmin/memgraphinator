@@ -29,8 +29,9 @@ class Graph(Gtk.DrawingArea):
         self.data = []
 
     def add_point(self, value):
-        self.data.append(value)
-        self.queue_draw()
+        if value is not None:
+            self.data.append(value)
+            self.queue_draw()
 
     def do_draw(self, cr):
         cr.save()
