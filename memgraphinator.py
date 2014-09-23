@@ -96,7 +96,7 @@ class MainWindow(Gtk.Window):
 
         self.connect("delete-event", Gtk.main_quit)
         self.poll()
-        GObject.timeout_add_seconds(1, self.poll)
+        GObject.timeout_add(100, self.poll)
 
     def poll(self):
         self.graph.add_point(mem_usage(self.pid))
