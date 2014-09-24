@@ -77,7 +77,7 @@ class Graph(Gtk.DrawingArea):
             return
 
         # approach 2: draw the graph from right to left, discarding data if it no longer fits
-        scale = max(self.data)
+        scale = max(self.data) or 1
         dx = 1
         dy = float(max(1, h - 10)) / scale
         n = min(len(self.data), w)
@@ -132,11 +132,30 @@ class ProcessGraph(Gtk.VBox):
     def pid(self, new_pid):
         self._pid = new_pid
         self.label.set_label(get_command_line(new_pid))
+        self._start_polling()
 
-    def add_point(self, value):
-        if value is not None:
+    def _start_polling(self):
+        self._start_polling = lambda: None  # don't do this again
+        self.poll()
+        GObject.timeout_add(100, self.poll)
+
+    def poll(self):
+        value = get_mem_usage(self.pid)
+        if value is None:
+            self.graph.add_point(0)
+            self.emit('exited')
+            return False
+        else:
             self.graph.add_point(value)
             self.size_label.set_label(format_size(value))
+            return True
+
+    def add_point(self, value):
+        self.graph.add_point(value)
+
+    @GObject.Signal
+    def exited(self):
+        pass
 
 
 class MainWindow(Gtk.Window):
@@ -144,11 +163,11 @@ class MainWindow(Gtk.Window):
     _pid = None
     exit_when_process_dies = False
 
-    def __init__(self, pid):
+    def __init__(self, pid, start_from_zero=False):
         super(MainWindow, self).__init__()
 
         self.connect("delete-event", Gtk.main_quit)
-        self.set_default_size(300, 100)
+        self.set_default_size(400, 200)
         self.set_border_width(6)
 
         self.select_button = Gtk.Button("Select a process")
@@ -156,6 +175,9 @@ class MainWindow(Gtk.Window):
         self.select_button.connect("clicked", self.select_process)
 
         self.graph = ProcessGraph()
+        self.graph.connect('exited', self.process_exited)
+        if start_from_zero:
+            self.graph.add_point(0)
         self.pid = pid
 
     @property
@@ -173,32 +195,20 @@ class MainWindow(Gtk.Window):
             self.graph.pid = new_pid
             self.add(self.graph)
             self.graph.show_all()
-            self._start_polling()
         else:
             self.set_title("Memory usage of a process")
             self.add(self.select_button)
             self.select_button.show()
-
-    def _start_polling(self):
-        self._start_polling = lambda: None  # don't do this again
-        self.poll()
-        GObject.timeout_add(100, self.poll)
-
-    def poll(self):
-        value = get_mem_usage(self.pid)
-        if value is None:
-            if self.exit_when_process_dies:
-                Gtk.main_quit()
-            return False
-        else:
-            self.graph.add_point(value)
-            return True
 
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
         if process_selector_dialog.run() == Gtk.ResponseType.OK:
             self.pid = process_selector_dialog.pid
         process_selector_dialog.destroy()
+
+    def process_exited(self, widget):
+        if self.exit_when_process_dies:
+            Gtk.main_quit()
 
 
 class ProcessSelector(Gtk.Dialog):
@@ -290,14 +300,15 @@ def main():
                         help='Exit when monitored process dies')
     args = parser.parse_args()
     if args.command and len(args.command) == 1 and args.command[0].isdigit():
-        pid = int(args.command[0])
-    elif args.pid:
+        args.pid = int(args.command[0])
+        args.command = None
+    if args.pid:
         pid = args.pid
     elif args.command:
         pid = subprocess.Popen(args.command).pid
     else:
         pid = None
-    win = MainWindow(pid)
+    win = MainWindow(pid, start_from_zero=bool(args.command))
     win.exit_when_process_dies = args.exit_when_process_dies
     win.show_all()
     signal.signal(signal.SIGINT, signal.SIG_DFL)
