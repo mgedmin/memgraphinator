@@ -55,6 +55,7 @@ class Graph(Gtk.DrawingArea):
     def __init__(self):
         super(Graph, self).__init__()
         self.data = []
+        self.set_size_request(50, 50)
 
     def add_point(self, value):
         if value is not None:
@@ -169,7 +170,7 @@ class MainWindow(Gtk.Window):
         self.graphs = []
 
         self.connect("delete-event", Gtk.main_quit)
-        self.set_default_size(400, 200)
+        self.set_default_size(400, 250)
         self.set_border_width(6)
 
         hb = Gtk.HeaderBar()
@@ -206,7 +207,30 @@ class MainWindow(Gtk.Window):
         if self.select_button:
             self.vbox.remove(self.select_button)
             self.select_button = None
+            grow = False
+        else:
+            grow = True
+
         self.vbox.add(graph)
+
+        if grow:
+            w, h = self.get_size()
+            mh = self.get_max_height()
+            if h < mh:
+                gh = self.graphs[0].get_allocated_height()
+                if gh == 1:
+                    # XXX: There's no size allocation before the window is
+                    # actually shown, so when we're adding multiple graphs
+                    # initially we don't know how big to make them.  So pick a
+                    # number, any number.
+                    gh = 138
+                h = min(mh, h + gh)
+                self.resize(w, h)
+
+    def get_max_height(self):
+        screen = self.get_screen()
+        return min(screen.get_monitor_geometry(n).height
+                   for n in range(screen.get_n_monitors())) - 100
 
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
