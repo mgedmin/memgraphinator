@@ -82,8 +82,8 @@ class Graph(Gtk.DrawingArea):
         scale = max(self.data) or 1
         dx = 1
         dy = float(max(1, h - 10)) / scale
-        n = min(len(self.data), w)
-        points = self._points(w - n, h, dx, -dy, slice(-n, None))
+        n = min(len(self.data), w + 1)
+        points = self._points(w - n + 1, h, dx, -dy, slice(-n, None))
 
         # color stolen from virt-manager
         cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
