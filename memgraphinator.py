@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import signal
+import sys
 import os
 import argparse
 import subprocess
@@ -160,12 +161,14 @@ class ProcessGraph(Gtk.VBox):
 
 class MainWindow(Gtk.Window):
 
-    _pid = None
-    exit_when_process_dies = False
-
-    def __init__(self, pid, start_from_zero=False):
+    def __init__(self, exit_when_process_dies=False):
         super(MainWindow, self).__init__()
 
+        self.exit_when_process_dies = exit_when_process_dies
+        self.dead = 0
+        self.graphs = []
+
+        self.set_title("Memory usage")
         self.connect("delete-event", Gtk.main_quit)
         self.set_default_size(400, 200)
         self.set_border_width(6)
@@ -174,41 +177,37 @@ class MainWindow(Gtk.Window):
         self.select_button.set_relief(Gtk.ReliefStyle.NONE)
         self.select_button.connect("clicked", self.select_process)
 
-        self.graph = ProcessGraph()
-        self.graph.connect('exited', self.process_exited)
+        self.vbox = Gtk.VBox()
+        self.vbox.add(self.select_button)
+        w = Gtk.ScrolledWindow()
+        w.add(self.vbox)
+        self.add(w)
+
+    def watch_pid(self, pid, start_from_zero=False):
+        graph = ProcessGraph()
+        graph.connect('exited', self.process_exited)
         if start_from_zero:
-            self.graph.add_point(0)
-        self.pid = pid
+            graph.add_point(0)
+        graph.pid = pid
+        graph.show_all()
+        self.graphs.append(graph)
 
-    @property
-    def pid(self):
-        return self._pid
-
-    @pid.setter
-    def pid(self, new_pid):
-        child = self.get_child()
-        if child:
-            self.remove(child)
-        if new_pid:
-            self._pid = new_pid
-            self.set_title("Memory usage of %d" % new_pid)
-            self.graph.pid = new_pid
-            self.add(self.graph)
-            self.graph.show_all()
-        else:
-            self.set_title("Memory usage of a process")
-            self.add(self.select_button)
-            self.select_button.show()
+        if self.select_button:
+            self.vbox.remove(self.select_button)
+            self.select_button = None
+        self.vbox.add(graph)
 
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
         if process_selector_dialog.run() == Gtk.ResponseType.OK:
-            self.pid = process_selector_dialog.pid
+            self.watch_pid(process_selector_dialog.pid)
         process_selector_dialog.destroy()
 
     def process_exited(self, widget):
         if self.exit_when_process_dies:
-            Gtk.main_quit()
+            self.dead += 1
+            if self.dead == len(self.graphs):
+                Gtk.main_quit()
 
 
 class ProcessSelector(Gtk.Dialog):
@@ -295,21 +294,29 @@ def main():
     parser = argparse.ArgumentParser(description="Graph process memory usage")
     parser.add_argument('command', nargs='*',
                         help='Command to execute')
-    parser.add_argument('-p', '--pid', type=int, help='Existing process to monitor')
+    parser.add_argument('-p', '--pid', type=int, action='append',
+                        help='Existing process to monitor')
     parser.add_argument('--exit-when-process-dies', action='store_true',
                         help='Exit when monitored process dies')
     args = parser.parse_args()
-    if args.command and len(args.command) == 1 and args.command[0].isdigit():
-        args.pid = int(args.command[0])
+    if args.command and all(arg.isdigit() for arg in args.command):
+        if args.pid is None:
+            args.pid = []
+        args.pid.extend(map(int, args.command))
         args.command = None
-    if args.pid:
-        pid = args.pid
-    elif args.command:
-        pid = subprocess.Popen(args.command).pid
+
+    start_from_zero = False
+    if args.command:
+        start_from_zero = True
+        try:
+            pids = [subprocess.Popen(args.command).pid]
+        except OSError as e:
+            sys.exit("%s: %s" % (args.command[0], e))
     else:
-        pid = None
-    win = MainWindow(pid, start_from_zero=bool(args.command))
-    win.exit_when_process_dies = args.exit_when_process_dies
+        pids = args.pid or []
+    win = MainWindow(exit_when_process_dies=args.exit_when_process_dies)
+    for pid in pids:
+        win.watch_pid(pid, start_from_zero=start_from_zero)
     win.show_all()
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     Gtk.main()
