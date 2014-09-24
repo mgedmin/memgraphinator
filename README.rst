@@ -45,6 +45,6 @@ Future plans
 ------------
 
 - Ability to quantify the jumps you see in the graph
-- Changeable zoom level (1px = 0.1s, 1s, 10s, entire graph)
+- Ability to quantify the time
 - Option to remove graphs
 - Option to pause graphs

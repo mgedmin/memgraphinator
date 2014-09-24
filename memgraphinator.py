@@ -52,6 +52,10 @@ def format_size(size):
 
 class Graph(Gtk.DrawingArea):
 
+    zoom = GObject.Property(
+        type=float, default=1.0, minimum=1.0, nick='Zoom factor',
+        blurb='Scale factor for zooming out the horizontal (time) axis')
+
     def __init__(self):
         super(Graph, self).__init__()
         self.data = []
@@ -80,10 +84,10 @@ class Graph(Gtk.DrawingArea):
 
         # approach 2: draw the graph from right to left, discarding data if it no longer fits
         scale = max(self.data) or 1
-        dx = 1
+        dx = 1 / self.zoom
         dy = float(max(1, h - 10)) / scale
-        n = min(len(self.data), w + 1)
-        points = self._points(w - n + 1, h, dx, -dy, slice(-n, None))
+        n = min(len(self.data), int(w * self.zoom + 1))
+        points = self._points(w - n * dx + 1, h, dx, -dy, slice(-n, None))
 
         # color stolen from virt-manager
         cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
@@ -115,12 +119,18 @@ class Graph(Gtk.DrawingArea):
 
 class ProcessGraph(Gtk.VBox):
 
+    zoom = GObject.Property(
+        type=float, default=1.0, minimum=1.0, nick='Zoom factor',
+        blurb='Scale factor for zooming out the horizontal (time) axis')
+
     def __init__(self):
         super(ProcessGraph, self).__init__(spacing=2)
         self.label = Gtk.Label('Process', xalign=0,
                                ellipsize=Pango.EllipsizeMode.END)
         self.pack_start(self.label, False, False, 0)
         self.graph = Graph()
+        self.bind_property("zoom", self.graph, "zoom",
+                           GObject.BindingFlags.BIDIRECTIONAL)
         self.pack_start(self.graph, True, True, 0)
         self.size_label = Gtk.Label('', xalign=1.0)
         self.pack_start(self.size_label, False, False, 0)
@@ -162,6 +172,10 @@ class ProcessGraph(Gtk.VBox):
 
 class MainWindow(Gtk.Window):
 
+    zoom = GObject.Property(
+        type=float, default=1.0, minimum=1.0, nick='Zoom factor',
+        blurb='Scale factor for zooming out the horizontal (time) axis')
+
     def __init__(self, exit_when_process_dies=False):
         super(MainWindow, self).__init__()
 
@@ -185,6 +199,25 @@ class MainWindow(Gtk.Window):
         button.connect("clicked", self.select_process)
         hb.pack_start(button)
 
+        box = Gtk.HBox()
+        Gtk.StyleContext.add_class(box.get_style_context(), "linked")
+
+        button = Gtk.Button()
+        icon = Gio.ThemedIcon(name="zoom-out")
+        image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
+        button.connect("clicked", self.zoom_out)
+        button.add(image)
+        box.add(button)
+
+        button = Gtk.Button()
+        icon = Gio.ThemedIcon(name="zoom-in")
+        image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
+        button.connect("clicked", self.zoom_in)
+        button.add(image)
+        box.add(button)
+
+        hb.pack_end(box)
+
         self.select_button = Gtk.Button("Select a process")
         self.select_button.set_relief(Gtk.ReliefStyle.NONE)
         self.select_button.connect("clicked", self.select_process)
@@ -198,6 +231,7 @@ class MainWindow(Gtk.Window):
     def watch_pid(self, pid, start_from_zero=False):
         graph = ProcessGraph()
         graph.connect('exited', self.process_exited)
+        self.bind_property("zoom", graph, "zoom")
         if start_from_zero:
             graph.add_point(0)
         graph.pid = pid
@@ -231,6 +265,13 @@ class MainWindow(Gtk.Window):
         screen = self.get_screen()
         return min(screen.get_monitor_geometry(n).height
                    for n in range(screen.get_n_monitors())) - 100
+
+    def zoom_in(self, target):
+        if self.zoom > 1.0:
+            self.zoom *= 0.5
+
+    def zoom_out(self, target):
+        self.zoom *= 2
 
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
