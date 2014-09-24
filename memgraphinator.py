@@ -4,10 +4,12 @@ import sys
 import os
 import argparse
 import subprocess
+import time
+import math
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, Gtk, Pango
+from gi.repository import GObject, Gtk, Gdk, Pango
 
 
 def list_processes():
@@ -52,6 +54,9 @@ def format_size(size):
 
 class Graph(Gtk.DrawingArea):
 
+    interval = GObject.Property(
+        type=int, default=100, minimum=1, nick='Update interval (ms)')
+
     zoom = GObject.Property(
         type=float, default=1.0, minimum=1.0, nick='Zoom factor',
         blurb='Scale factor for zooming out the horizontal (time) axis')
@@ -59,19 +64,46 @@ class Graph(Gtk.DrawingArea):
     paused = GObject.Property(
         type=bool, default=False, nick='Paused')
 
+    cur_time = GObject.Property(
+        type=float, nick='Time (time_t) value under pointer')
+
+    cur_value = GObject.Property(
+        type=int, nick='Value under pointer')
+
     def __init__(self):
         super(Graph, self).__init__()
+        self.time = None
         self.data = []
+        self.cur_pos = None
+        self.cur_time = -1
+        self.cur_value = -1
         self.set_size_request(50, 50)
+        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.connect('notify::zoom', lambda *a: self.queue_draw())
 
     def add_point(self, value):
         if value is not None:
+            self.time = time.time()
             self.data.append(value)
             self.queue_draw()
 
+    def do_motion_notify_event(self, event):
+        self.cur_pos = event.x, event.y
+        self.queue_draw()
+
+    def do_leave_notify_event(self, event):
+        self.cur_pos = None
+        self.cur_time = -1
+        self.cur_value = -1
+        self.queue_draw()
+
     def do_draw(self, cr):
         cr.save()
+        with self.freeze_notify():
+            self._draw(cr)
+        cr.restore()
 
+    def _draw(self, cr):
         window = self.get_window()
         w = window.get_width()
         h = window.get_height()
@@ -80,6 +112,17 @@ class Graph(Gtk.DrawingArea):
         cr.set_source_rgb(1, 1, 1)
         cr.rectangle(0, 0, w, h)
         cr.fill()
+
+        # mouse position
+        if self.cur_pos:
+            x, y = self.cur_pos
+            cr.set_source_rgba(0.75, 0.75, 0.75, 0.5)
+            cr.set_line_width(1)
+            cr.move_to(x + 0.5, 0)
+            cr.line_to(x + 0.5, h)
+            cr.stroke()
+            self.cur_time = -1
+            self.cur_value = -1
 
         n = len(self.data)
         if not n:
@@ -101,16 +144,30 @@ class Graph(Gtk.DrawingArea):
         self._line(cr, points)
         cr.stroke()
 
+        if self.cur_pos and self.time:
+            x, y = self.cur_pos
+            distance_from_right = (w - x)
+            time = self.time - distance_from_right * self.zoom * self.interval * 0.001
+            idx = -int(distance_from_right / dx) - 1
+            try:
+                value = self.data[idx]
+            except IndexError:
+                pass
+            else:
+                self.cur_time = time
+                self.cur_value = value
+                cr.set_line_width(1)
+                cr.arc(points[idx][0] + 0.5, points[idx][1], 2, 0, 2 * math.pi)
+                cr.fill()
+
         if self.paused:
-            cr.set_source_rgb(0.854902, 0.945098, 0.8627451)
+            cr.set_source_rgba(0.854902, 0.945098, 0.8627451, .5)
         else:
             cr.set_source_rgba(0.71484375, 0.84765625, 0.89453125, .5)
         self._line(cr, points)
         cr.line_to(points[-1][0], h)
         cr.line_to(points[0][0], h)
         cr.fill()
-
-        cr.restore()
 
     def _points(self, x0, y0, dx, dy, slice=slice(None)):
         pts = []
@@ -138,14 +195,20 @@ class ProcessGraph(Gtk.VBox):
                                ellipsize=Pango.EllipsizeMode.END)
         self.pack_start(self.label, False, False, 0)
         self.graph = Graph()
-        self.bind_property("zoom", self.graph, "zoom",
-                           GObject.BindingFlags.BIDIRECTIONAL)
+        self.bind_property("interval", self.graph, "interval")
+        self.bind_property("zoom", self.graph, "zoom")
         f = Gtk.Frame()
         f.add(self.graph)
         self.pack_start(f, True, True, 0)
+        b = Gtk.HBox()
+        self.cur_value_label = Gtk.Label('', xalign=0.0)
+        self.graph.connect("notify::cur-value", self.cur_value_changed)
+        b.pack_start(self.cur_value_label, True, True, 0)
         self.size_label = Gtk.Label('', xalign=1.0)
-        self.pack_start(self.size_label, False, False, 0)
+        b.pack_end(self.size_label, True, True, 0)
+        self.pack_start(b, False, False, 0)
         self._pid = None
+        self._interval = 100
 
     @property
     def pid(self):
@@ -157,10 +220,21 @@ class ProcessGraph(Gtk.VBox):
         self.label.set_label(get_command_line(new_pid))
         self._start_polling()
 
+    @GObject.Property(
+        type=int, default=100, minimum=1, nick='Update interval (ms)')
+    def interval(self):
+        return self._interval
+
+    @interval.setter
+    def interval(self, new_value):
+        if self.pid is not None:
+            raise TypeError('Cannot change interval once polling is started')
+        self._interval = new_value
+
     def _start_polling(self):
         self._start_polling = lambda: None  # don't do this again
         self.poll()
-        GObject.timeout_add(100, self.poll)
+        GObject.timeout_add(self.interval, self.poll)
 
     def poll(self):
         value = get_mem_usage(self.pid)
@@ -176,6 +250,14 @@ class ProcessGraph(Gtk.VBox):
 
     def add_point(self, value):
         self.graph.add_point(value)
+
+    def cur_value_changed(self, *args):
+        value = self.graph.cur_value
+        ago = self.graph.time - self.graph.cur_time
+        if value == -1:
+            self.cur_value_label.set_label("")
+        else:
+            self.cur_value_label.set_label("%s, %d seconds ago" % (format_size(value), ago))
 
     @GObject.Signal
     def exited(self):
