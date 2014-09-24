@@ -143,6 +143,10 @@ class MainWindow(Gtk.Window):
 
 class ProcessSelector(Gtk.Dialog):
 
+    class Column:
+        types = (int, str, int, str, bool)
+        PID, COMMAND, SIZE, SIZE_TEXT, MINE = range(len(types))
+
     def __init__(self, parent):
         super(ProcessSelector, self).__init__(
             "Select a process", parent=parent,
@@ -151,40 +155,58 @@ class ProcessSelector(Gtk.Dialog):
                      Gtk.STOCK_OK, Gtk.ResponseType.OK))
         self.set_default_size(600, 400)
         area = self.get_content_area()
-        self.store = Gtk.ListStore(int, str, int, str) # pid, command, size, size_string
-        self.refresh_process_list()
-        self.process_list = Gtk.TreeView(model=self.store)
-        self.process_list.set_search_column(1)
-        column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0), text=0)
-        column.set_sort_column_id(0)
+        self.store = Gtk.ListStore(*self.Column.types)
+        self.filter_model = Gtk.TreeModelFilter(child_model=self.store)
+        self.filter_model.set_visible_func(self.is_process_visible)
+        self.process_list = Gtk.TreeView(model=self.filter_model)
+        self.process_list.set_search_column(self.Column.COMMAND)
+        column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0),
+                                    text=self.Column.PID)
+        column.set_sort_column_id(self.Column.PID)
         self.process_list.append_column(column)
-        column = Gtk.TreeViewColumn("Command", Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END), text=1)
-        column.set_sort_column_id(1)
+        column = Gtk.TreeViewColumn("Command",
+                                    Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END),
+                                    text=self.Column.COMMAND)
+        column.set_sort_column_id(self.Column.COMMAND)
         column.set_expand(True)
         column.set_max_width(200)
         self.process_list.append_column(column)
-        column = Gtk.TreeViewColumn("Size", Gtk.CellRendererText(xalign=1.0), text=3)
-        column.set_sort_column_id(2)
+        column = Gtk.TreeViewColumn("Size", Gtk.CellRendererText(xalign=1.0),
+                                    text=self.Column.SIZE_TEXT)
+        column.set_sort_column_id(self.Column.SIZE)
         self.process_list.append_column(column)
         self.process_list.connect("row_activated", self.select_process)
         w = Gtk.ScrolledWindow()
         w.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         w.add(self.process_list)
         area.pack_start(w, True, True, 0)
+        self.show_all_checkbox = Gtk.CheckButton(label='Show processes belonging to all users')
+        self.show_all_checkbox.connect('toggled', self.show_all_toggled)
+        area.pack_start(self.show_all_checkbox, False, False, 0)
         area.show_all()
+        GObject.idle_add(self.refresh_process_list)
 
     @property
     def pid(self):
         model, iter = self.process_list.get_selection().get_selected()
         if not iter:
             return None
-        return model[iter][0]
+        return model[iter][self.Column.PID]
+
+    def show_all_toggled(self, widget):
+        self.filter_model.refilter()
+
+    def is_process_visible(self, model, iter, data):
+        if self.show_all_checkbox.get_active():
+            return True
+        return model[iter][self.Column.MINE]
 
     def select_process(self, treeview, path, view_column):
         self.response(Gtk.ResponseType.OK)
 
     def refresh_process_list(self):
         self.store.clear()
+        my_uid = os.getuid()
         for n in os.listdir('/proc'):
             if n.isdigit():
                 try:
@@ -194,12 +216,14 @@ class ProcessSelector(Gtk.Dialog):
                         with open('/proc/%s/stat' % n, 'rb') as f:
                             stat = f.read()
                             cmdline = stat.partition('(')[-1].rpartition(')')[0]
+                    owner = os.stat('/proc/%s' % n).st_uid
                 except IOError:
                     continue
                 pid = int(n)
                 size = mem_usage(pid) or 0
                 size_mb = '{:,} MB'.format(size / 1024)
-                self.store.append([pid, cmdline, size, size_mb])
+                mine = owner == my_uid
+                self.store.append([pid, cmdline, size, size_mb, mine])
 
 
 win = MainWindow(pid)
