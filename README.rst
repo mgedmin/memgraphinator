@@ -12,6 +12,8 @@ I couldn't find one so I started writing my own.
 Usage
 -----
 
+::
+
     ./memgraphinator.py [--exit-when-process-dies]
     ./memgraphinator.py [--exit-when-process-dies] [-p|--pid] PID
     ./memgraphinator.py [--exit-when-process-dies] [--] command [args ...]
