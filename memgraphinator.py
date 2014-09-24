@@ -56,6 +56,9 @@ class Graph(Gtk.DrawingArea):
         type=float, default=1.0, minimum=1.0, nick='Zoom factor',
         blurb='Scale factor for zooming out the horizontal (time) axis')
 
+    paused = GObject.Property(
+        type=bool, default=False, nick='Paused')
+
     def __init__(self):
         super(Graph, self).__init__()
         self.data = []
@@ -90,12 +93,18 @@ class Graph(Gtk.DrawingArea):
         points = self._points(w - n * dx + 1, h, dx, -dy, slice(-n, None))
 
         # color stolen from virt-manager
-        cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
+        if self.paused:
+            cr.set_source_rgb(0.421875, 0.73046875, 0.4705882)
+        else:
+            cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
         cr.set_line_width(1)
         self._line(cr, points)
         cr.stroke()
 
-        cr.set_source_rgba(0.71484375, 0.84765625, 0.89453125, .5)
+        if self.paused:
+            cr.set_source_rgb(0.854902, 0.945098, 0.8627451)
+        else:
+            cr.set_source_rgba(0.71484375, 0.84765625, 0.89453125, .5)
         self._line(cr, points)
         cr.line_to(points[-1][0], h)
         cr.line_to(points[0][0], h)
@@ -155,6 +164,7 @@ class ProcessGraph(Gtk.VBox):
         value = get_mem_usage(self.pid)
         if value is None:
             self.graph.add_point(0)
+            self.graph.paused = True
             self.emit('exited')
             return False
         else:

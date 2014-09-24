@@ -15,7 +15,7 @@ Usage
 ::
 
     ./memgraphinator.py [--exit-when-process-dies]
-    ./memgraphinator.py [--exit-when-process-dies] [-p|--pid] PID
+    ./memgraphinator.py [--exit-when-process-dies] [-p|--pid] PID ...
     ./memgraphinator.py [--exit-when-process-dies] [--] command [args ...]
     ./memgraphinator.py -h|--help
 
