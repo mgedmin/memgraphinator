@@ -140,7 +140,9 @@ class ProcessGraph(Gtk.VBox):
         self.graph = Graph()
         self.bind_property("zoom", self.graph, "zoom",
                            GObject.BindingFlags.BIDIRECTIONAL)
-        self.pack_start(self.graph, True, True, 0)
+        f = Gtk.Frame()
+        f.add(self.graph)
+        self.pack_start(f, True, True, 0)
         self.size_label = Gtk.Label('', xalign=1.0)
         self.pack_start(self.size_label, False, False, 0)
         self._pid = None
