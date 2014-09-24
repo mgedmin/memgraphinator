@@ -7,7 +7,7 @@ import subprocess
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, Gtk, Pango
+from gi.repository import GObject, Gtk, Gio, Pango
 
 
 def list_processes():
@@ -168,10 +168,21 @@ class MainWindow(Gtk.Window):
         self.dead = 0
         self.graphs = []
 
-        self.set_title("Memory usage")
         self.connect("delete-event", Gtk.main_quit)
         self.set_default_size(400, 200)
         self.set_border_width(6)
+
+        hb = Gtk.HeaderBar()
+        hb.set_show_close_button(True)
+        hb.set_title("Memory usage")
+        self.set_titlebar(hb)
+
+        button = Gtk.Button()
+        icon = Gio.ThemedIcon(name="list-add")
+        image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
+        button.add(image)
+        button.connect("clicked", self.select_process)
+        hb.pack_start(button)
 
         self.select_button = Gtk.Button("Select a process")
         self.select_button.set_relief(Gtk.ReliefStyle.NONE)
