@@ -8,7 +8,33 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gtk, Pango
 
 
-def mem_usage(pid):
+def list_processes():
+    for n in os.listdir('/proc'):
+        if n.isdigit():
+            yield int(n)
+
+
+def get_command_line(pid):
+    try:
+        with open('/proc/%d/cmdline' % pid, 'rb') as f:
+            cmdline = f.read().replace('\0', ' ')
+        if not cmdline:
+            with open('/proc/%d/stat' % pid, 'rb') as f:
+                stat = f.read()
+                cmdline = stat.partition('(')[-1].rpartition(')')[0]
+        return cmdline
+    except IOError:
+        return None
+
+
+def get_owner(pid):
+    try:
+        return os.stat('/proc/%d' % pid).st_uid
+    except IOError:
+        return None
+
+
+def get_mem_usage(pid):
     try:
         with open('/proc/%d/status' % pid) as fp:
             for line in fp:
@@ -125,7 +151,7 @@ class MainWindow(Gtk.Window):
         GObject.timeout_add(100, self.poll)
 
     def poll(self):
-        self.graph.add_point(mem_usage(self.pid))
+        self.graph.add_point(get_mem_usage(self.pid))
         return True
 
     def select_process(self, target):
@@ -201,23 +227,17 @@ class ProcessSelector(Gtk.Dialog):
     def refresh_process_list(self):
         self.store.clear()
         my_uid = os.getuid()
-        for n in os.listdir('/proc'):
-            if n.isdigit():
-                try:
-                    with open('/proc/%s/cmdline' % n, 'rb') as f:
-                        cmdline = f.read().replace('\0', ' ')
-                    if not cmdline:
-                        with open('/proc/%s/stat' % n, 'rb') as f:
-                            stat = f.read()
-                            cmdline = stat.partition('(')[-1].rpartition(')')[0]
-                    owner = os.stat('/proc/%s' % n).st_uid
-                except IOError:
-                    continue
-                pid = int(n)
-                size = mem_usage(pid) or 0
-                size_mb = '{:,} MB'.format(size / 1024)
-                mine = owner == my_uid
-                self.store.append([pid, cmdline, size, size_mb, mine])
+        for pid in list_processes():
+            cmdline = get_command_line(pid)
+            owner = get_owner(pid)
+            size = get_mem_usage(pid)
+            if cmdline is None or owner is None or size is None:
+                # process must've just died.  size being None might also
+                # indicate a kernel thread (and we're not interested in those)
+                continue
+            size_mb = '{:,} MB'.format(size / 1024)
+            mine = owner == my_uid
+            self.store.append([pid, cmdline, size, size_mb, mine])
 
 
 def main():
