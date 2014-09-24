@@ -484,22 +484,37 @@ def main():
         args.command = None
 
     start_from_zero = False
+    child = None
     if args.command:
         start_from_zero = True
         try:
-            pids = [subprocess.Popen(args.command).pid]
+            child = subprocess.Popen(args.command)
+            pids = [child.pid]
         except OSError as e:
             sys.exit("%s: %s" % (args.command[0], e))
     else:
         pids = args.pid or []
-    win = MainWindow(exit_when_process_dies=args.exit_when_process_dies)
-    if args.self:
-        win.watch_pid(os.getpid(), start_from_zero=True)
-    for pid in pids:
-        win.watch_pid(pid, start_from_zero=start_from_zero)
-    win.show_all()
-    signal.signal(signal.SIGINT, signal.SIG_DFL)
-    Gtk.main()
+    try:
+        win = MainWindow(exit_when_process_dies=args.exit_when_process_dies)
+        if args.self:
+            win.watch_pid(os.getpid(), start_from_zero=True)
+        for pid in pids:
+            win.watch_pid(pid, start_from_zero=start_from_zero)
+        win.show_all()
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        Gtk.main()
+    finally:
+        if child and child.poll() is None:
+            print("Killing child %d" % child.pid)
+            child.terminate()
+            timeout = 50 # 5 seconds
+            while child.poll() is None and timeout:
+                time.sleep(0.1)
+                timeout -= 1
+            if child.poll() is None:
+                print("Killing child %d with SIGKILL" % child.pid)
+                child.send_signal(9)
+                child.wait()
 
 if __name__ == '__main__':
     main()
