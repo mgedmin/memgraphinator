@@ -13,7 +13,22 @@ to see more or less.
 
 Usage::
 
-    ./memgraphinator.py [pid]
+    ./memgraphinator.py [--exit-when-process-dies]
+    ./memgraphinator.py [--exit-when-process-dies] [-p|--pid] PID
+    ./memgraphinator.py [--exit-when-process-dies] [--] command [args ...]
+    ./memgraphinator.py -h|--help
+
+
+Graph process memory usage
+
+positional arguments:
+  command [args]        Command to execute and monitor
+
+optional arguments:
+  -h, --help            Show this help message and exit
+  -p PID, --pid PID     Specify existing process to monitor
+  --exit-when-process-dies
+                        Exit when monitored process dies
 
 
 Requirements
@@ -29,8 +44,6 @@ Requirements
 Future plans
 ------------
 
-- Show current and peak memory usage numbers below the graph
-- Show process name and command-line arguments above the graph
+- Show memory usage number somewhere
 - Changeable zoom level (1px = 0.1s, 1s, 10s, entire graph)
-- Searching/filtering in the process picker
 - Ability to watch multiple processes simultaneously
