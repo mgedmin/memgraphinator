@@ -8,12 +8,6 @@ gi.require_version('Gtk', '3.0')
 from gi.repository import GObject, Gtk, Pango
 
 
-if len(sys.argv) < 2:
-    pid = None
-else:
-    pid = int(sys.argv[1])
-
-
 def mem_usage(pid):
     try:
         with open('/proc/%d/status' % pid) as fp:
@@ -226,7 +220,15 @@ class ProcessSelector(Gtk.Dialog):
                 self.store.append([pid, cmdline, size, size_mb, mine])
 
 
-win = MainWindow(pid)
-win.show_all()
-signal.signal(signal.SIGINT, signal.SIG_DFL)
-Gtk.main()
+def main():
+    if len(sys.argv) < 2:
+        pid = None
+    else:
+        pid = int(sys.argv[1])
+    win = MainWindow(pid)
+    win.show_all()
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+    Gtk.main()
+
+if __name__ == '__main__':
+    main()
