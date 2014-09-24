@@ -44,7 +44,5 @@ Requirements
 Future plans
 ------------
 
-- Ability to quantify the jumps you see in the graph
-- Ability to quantify the time
 - Option to remove graphs
 - Option to pause graphs

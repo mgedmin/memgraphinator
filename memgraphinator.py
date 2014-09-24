@@ -52,6 +52,18 @@ def format_size(size):
     return '{:,} MB'.format(size / 1024)
 
 
+def format_time_ago(seconds):
+    if seconds < 60:
+        return '%d seconds ago' % seconds
+    elif seconds < 60 * 60:
+        m, s = divmod(seconds, 60)
+        return '%d minutes, %d seconds ago' % (m, s)
+    else:
+        m, s = divmod(seconds, 60)
+        h, m = divmod(m, 24)
+        return '%d hours, %d minutes, %d seconds ago' % (h, m, s)
+
+
 class Graph(Gtk.DrawingArea):
 
     interval = GObject.Property(
@@ -149,12 +161,12 @@ class Graph(Gtk.DrawingArea):
             distance_from_right = (w - x)
             time = self.time - distance_from_right * self.zoom * self.interval * 0.001
             idx = -int(distance_from_right / dx) - 1
+            self.cur_time = time
             try:
                 value = self.data[idx]
             except IndexError:
                 pass
             else:
-                self.cur_time = time
                 self.cur_value = value
                 cr.set_line_width(1)
                 cr.arc(points[idx][0] + 0.5, points[idx][1], 2, 0, 2 * math.pi)
@@ -252,12 +264,15 @@ class ProcessGraph(Gtk.VBox):
         self.graph.add_point(value)
 
     def cur_value_changed(self, *args):
-        value = self.graph.cur_value
+        if self.graph.cur_time == -1:
+            self.cur_value_label.set_label('')
+            return
         ago = self.graph.time - self.graph.cur_time
+        value = self.graph.cur_value
         if value == -1:
-            self.cur_value_label.set_label("")
+            self.cur_value_label.set_label(format_time_ago(ago))
         else:
-            self.cur_value_label.set_label("%s, %d seconds ago" % (format_size(value), ago))
+            self.cur_value_label.set_label("%s, %s" % (format_size(value), format_time_ago(ago)))
 
     @GObject.Signal
     def exited(self):
