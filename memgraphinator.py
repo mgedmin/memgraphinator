@@ -210,7 +210,7 @@ class MainWindow(Gtk.Window):
         hb.pack_start(button)
 
         box = Gtk.HBox()
-        Gtk.StyleContext.add_class(box.get_style_context(), "linked")
+        box.get_style_context().add_class("linked")
 
         button = Gtk.Button()
         icon = Gio.ThemedIcon(name="zoom-out")
@@ -308,10 +308,12 @@ class ProcessSelector(Gtk.Dialog):
     def __init__(self, parent):
         super(ProcessSelector, self).__init__(
             "Select a process", parent=parent,
-            flags=Gtk.DialogFlags.MODAL | Gtk.DialogFlags.USE_HEADER_BAR,
+            flags=Gtk.DialogFlags.MODAL, use_header_bar=True,
             buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                      Gtk.STOCK_OK, Gtk.ResponseType.OK))
         self.set_default_size(600, 400)
+        ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
+        ok_button.get_style_context().add_class("suggested-action")
         area = self.get_content_area()
         self.store = Gtk.ListStore(*self.Column.types)
         self.filter_model = Gtk.TreeModelFilter(child_model=self.store)
