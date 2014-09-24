@@ -7,7 +7,7 @@ import subprocess
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, Gtk, Gio, Pango
+from gi.repository import GObject, Gtk, Pango
 
 
 def list_processes():
@@ -309,6 +309,7 @@ class ProcessSelector(Gtk.Dialog):
             buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
                      Gtk.STOCK_OK, Gtk.ResponseType.OK))
         self.set_default_size(600, 400)
+        self.set_border_width(6)
         ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
         ok_button.get_style_context().add_class("suggested-action")
         area = self.get_content_area()
@@ -336,10 +337,14 @@ class ProcessSelector(Gtk.Dialog):
         w = Gtk.ScrolledWindow()
         w.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
         w.add(self.process_list)
-        area.pack_start(w, True, True, 0)
+        f = Gtk.Frame()
+        f.add(w)
+        area.pack_start(f, True, True, 0)
+        area.show_all()
+        area = self.get_action_area()
         self.show_all_checkbox = Gtk.CheckButton(label='Show processes belonging to all users')
         self.show_all_checkbox.connect('toggled', self.show_all_toggled)
-        area.pack_start(self.show_all_checkbox, False, False, 0)
+        area.pack_start(self.show_all_checkbox, False, False, 6)
         area.show_all()
         GObject.idle_add(self.refresh_process_list)
 
