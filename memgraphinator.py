@@ -218,7 +218,8 @@ class ProcessSelector(Gtk.Dialog):
         self.store = Gtk.ListStore(*self.Column.types)
         self.filter_model = Gtk.TreeModelFilter(child_model=self.store)
         self.filter_model.set_visible_func(self.is_process_visible)
-        self.process_list = Gtk.TreeView(model=self.filter_model)
+        self.sort_model = Gtk.TreeModelSort(model=self.filter_model)
+        self.process_list = Gtk.TreeView(model=self.sort_model)
         self.process_list.set_search_column(self.Column.COMMAND)
         column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0),
                                     text=self.Column.PID)
