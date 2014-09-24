@@ -209,13 +209,15 @@ class MainWindow(Gtk.Window):
         box = Gtk.HBox()
         box.get_style_context().add_class("linked")
 
-        button = Gtk.Button.new_from_icon_name("zoom-out", Gtk.IconSize.BUTTON)
-        button.connect("clicked", self.zoom_out)
-        box.add(button)
+        self.zoom_out_button = Gtk.Button.new_from_icon_name("zoom-out", Gtk.IconSize.BUTTON)
+        self.zoom_out_button.set_sensitive(False)
+        self.zoom_out_button.connect("clicked", self.zoom_out)
+        box.add(self.zoom_out_button)
 
-        button = Gtk.Button.new_from_icon_name("zoom-in", Gtk.IconSize.BUTTON)
-        button.connect("clicked", self.zoom_in)
-        box.add(button)
+        self.zoom_in_button = Gtk.Button.new_from_icon_name("zoom-in", Gtk.IconSize.BUTTON)
+        self.zoom_in_button.set_sensitive(False)
+        self.zoom_in_button.connect("clicked", self.zoom_in)
+        box.add(self.zoom_in_button)
 
         hb.pack_end(box)
 
@@ -242,6 +244,7 @@ class MainWindow(Gtk.Window):
         if self.select_button:
             self.vbox.remove(self.select_button)
             self.select_button = None
+            self.zoom_out_button.set_sensitive(True)
             grow = False
         else:
             grow = True
@@ -270,9 +273,12 @@ class MainWindow(Gtk.Window):
     def zoom_in(self, target):
         if self.zoom > 1.0:
             self.zoom *= 0.5
+        if self.zoom == 1.0:
+            self.zoom_in_button.set_sensitive(False)
 
     def zoom_out(self, target):
-        self.zoom *= 2
+        self.zoom *= 2.0
+        self.zoom_in_button.set_sensitive(True)
 
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
