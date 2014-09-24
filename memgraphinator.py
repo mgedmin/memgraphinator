@@ -296,6 +296,8 @@ def main():
                         help='Command to execute')
     parser.add_argument('-p', '--pid', type=int, action='append',
                         help='Existing process to monitor')
+    parser.add_argument('--self', action='store_true',
+                        help='Watch the memory usage of memgraphinator itself')
     parser.add_argument('--exit-when-process-dies', action='store_true',
                         help='Exit when monitored process dies')
     args = parser.parse_args()
@@ -315,6 +317,8 @@ def main():
     else:
         pids = args.pid or []
     win = MainWindow(exit_when_process_dies=args.exit_when_process_dies)
+    if args.self:
+        win.watch_pid(os.getpid(), start_from_zero=True)
     for pid in pids:
         win.watch_pid(pid, start_from_zero=start_from_zero)
     win.show_all()
