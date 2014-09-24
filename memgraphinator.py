@@ -116,7 +116,7 @@ class Graph(Gtk.DrawingArea):
 class ProcessGraph(Gtk.VBox):
 
     def __init__(self):
-        super(ProcessGraph, self).__init__()
+        super(ProcessGraph, self).__init__(spacing=2)
         self.label = Gtk.Label('Process', xalign=0,
                                ellipsize=Pango.EllipsizeMode.END)
         self.pack_start(self.label, False, False, 0)
