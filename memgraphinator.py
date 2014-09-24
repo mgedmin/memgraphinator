@@ -44,6 +44,10 @@ def get_mem_usage(pid):
         return None
 
 
+def format_size(size):
+    return '{:,} MB'.format(size / 1024)
+
+
 class Graph(Gtk.DrawingArea):
 
     def __init__(self):
@@ -106,6 +110,33 @@ class Graph(Gtk.DrawingArea):
                 cr.line_to(x, y)
 
 
+class ProcessGraph(Gtk.VBox):
+
+    def __init__(self):
+        super(ProcessGraph, self).__init__()
+        self.label = Gtk.Label('Process', xalign=0,
+                               ellipsize=Pango.EllipsizeMode.END)
+        self.pack_start(self.label, False, False, 0)
+        self.graph = Graph()
+        self.pack_start(self.graph, True, True, 0)
+        self.size_label = Gtk.Label('', xalign=1.0)
+        self.pack_start(self.size_label, False, False, 0)
+        self._pid = None
+
+    @property
+    def pid(self):
+        return self._pid
+
+    @pid.setter
+    def pid(self, new_pid):
+        self._pid = new_pid
+        self.label.set_label(get_command_line(new_pid))
+
+    def add_point(self, value):
+        self.graph.add_point(value)
+        self.size_label.set_label(format_size(value))
+
+
 class MainWindow(Gtk.Window):
 
     _pid = None
@@ -121,8 +152,7 @@ class MainWindow(Gtk.Window):
         self.select_button.set_relief(Gtk.ReliefStyle.NONE)
         self.select_button.connect("clicked", self.select_process)
 
-        self.graph = Graph()
-
+        self.graph = ProcessGraph()
         self.pid = pid
 
     @property
@@ -137,8 +167,9 @@ class MainWindow(Gtk.Window):
         if new_pid:
             self._pid = new_pid
             self.set_title("Memory usage of %d" % new_pid)
+            self.graph.pid = new_pid
             self.add(self.graph)
-            self.graph.show()
+            self.graph.show_all()
             self._start_polling()
         else:
             self.set_title("Memory usage of a process")
@@ -235,7 +266,7 @@ class ProcessSelector(Gtk.Dialog):
                 # process must've just died.  size being None might also
                 # indicate a kernel thread (and we're not interested in those)
                 continue
-            size_mb = '{:,} MB'.format(size / 1024)
+            size_mb = format_size(size)
             mine = owner == my_uid
             self.store.append([pid, cmdline, size, size_mb, mine])
 
