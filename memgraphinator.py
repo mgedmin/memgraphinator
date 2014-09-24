@@ -235,7 +235,10 @@ class MainWindow(Gtk.Window):
     def select_process(self, target):
         process_selector_dialog = ProcessSelector(self)
         if process_selector_dialog.run() == Gtk.ResponseType.OK:
-            self.watch_pid(process_selector_dialog.pid)
+            pid = process_selector_dialog.pid
+            if pid is not None:
+                # TODO: disable the Ok button if there's no selection
+                self.watch_pid(pid)
         process_selector_dialog.destroy()
 
     def process_exited(self, widget):
@@ -274,7 +277,6 @@ class ProcessSelector(Gtk.Dialog):
                                     text=self.Column.COMMAND)
         column.set_sort_column_id(self.Column.COMMAND)
         column.set_expand(True)
-        column.set_max_width(200)
         self.process_list.append_column(column)
         column = Gtk.TreeViewColumn("Size", Gtk.CellRendererText(xalign=1.0),
                                     text=self.Column.SIZE_TEXT)
