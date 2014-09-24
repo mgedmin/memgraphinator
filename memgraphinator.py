@@ -158,7 +158,7 @@ class ProcessSelector(Gtk.Dialog):
         column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0), text=0)
         column.set_sort_column_id(0)
         self.process_list.append_column(column)
-        column = Gtk.TreeViewColumn("Command", Gtk.CellRendererText(), text=1)
+        column = Gtk.TreeViewColumn("Command", Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END), text=1)
         column.set_sort_column_id(1)
         column.set_expand(True)
         column.set_max_width(200)
