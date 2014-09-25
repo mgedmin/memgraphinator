@@ -32,13 +32,18 @@ optional arguments:
 Requirements
 ------------
 
+- Linux (for /proc/{pid}/status)
+
 - Python
 
 - PyGObject with GIR libraries for Gtk etc.
 
-- A reasonably new Gtk+ (with header bars etc.)
+- A reasonably new Gtk+ (with header bars etc., which I think means 3.12)
 
-- Linux (for /proc/{pid}/status)
+.. note:: Ubuntu 14.04 LTS is too old, unless you enable the unstable
+          `GNOME 3 staging PPA`_.
+
+.. _GNOME 3 staging PPA: https://launchpad.net/~gnome3-team/+archive/ubuntu/gnome3-staging
 
 
 Future plans
@@ -46,3 +51,5 @@ Future plans
 
 - Option to remove graphs
 - Option to see RSS instead of VIRT
+- Accurate time axis (when you suspend laptop, graph stops, but this is
+  not refected in "N seconds ago" messages)
