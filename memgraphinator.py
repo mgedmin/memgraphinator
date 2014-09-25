@@ -73,31 +73,74 @@ class Graph(Gtk.DrawingArea):
         type=float, default=1.0, minimum=1.0, nick='Zoom factor',
         blurb='Scale factor for zooming out the horizontal (time) axis')
 
-    paused = GObject.Property(
-        type=bool, default=False, nick='Paused')
-
-    cur_time = GObject.Property(
-        type=float, nick='Time (time_t) value under pointer')
-
-    cur_value = GObject.Property(
-        type=int, nick='Value under pointer')
-
     def __init__(self):
         super(Graph, self).__init__()
         self.time = None
         self.data = []
+        self._paused = False
+        self._terminated = False
+        self.visible_data = self.data
+        self.visible_time = None
         self.cur_pos = None
-        self.cur_time = -1
-        self.cur_value = -1
+        self._cur_time = -1
+        self._cur_value = -1
         self.set_size_request(50, 50)
-        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK | Gdk.EventMask.LEAVE_NOTIFY_MASK)
+        self.add_events(Gdk.EventMask.POINTER_MOTION_MASK |
+                        Gdk.EventMask.LEAVE_NOTIFY_MASK |
+                        Gdk.EventMask.BUTTON_PRESS_MASK)
         self.connect('notify::zoom', lambda *a: self.queue_draw())
+
+    @GObject.Property(type=float, nick='Time (time_t) value under pointer')
+    def cur_time(self):
+        return self._cur_time
+
+    @GObject.Property(type=int, nick='Value under pointer')
+    def cur_value(self):
+        return self._cur_value
+
+    def _set_cur_time_value(self, time, value):
+        if time == self._cur_time and value == self._cur_value:
+            return
+        self._cur_time = time
+        self._cur_value = value
+        # XXX: notifications not worky!
+        self.notify("cur-time")
+        self.notify("cur-value")
+
+    @GObject.Property(type=bool, default=False, nick='Terminated')
+    def terminated(self):
+        return self._terminated
+
+    @terminated.setter
+    def terminated(self, new_value):
+        self._terminated = new_value
+        if self._terminated:
+            self.paused = True
+
+    @GObject.Property(type=bool, default=False, nick='Paused')
+    def paused(self):
+        return self._paused
+
+    @paused.setter
+    def paused(self, new_value):
+        if self.terminated:
+            new_value = True
+        if new_value != self._paused:
+            self._paused = new_value
+            if self._paused:
+                self.visible_data = list(self.data)
+            else:
+                self.visible_data = self.data
+                self.visible_time = self.time
+            self.queue_draw()
 
     def add_point(self, value):
         if value is not None:
             self.time = time.time()
             self.data.append(value)
-            self.queue_draw()
+            if not self.paused:
+                self.visible_time = self.time
+                self.queue_draw()
 
     def do_motion_notify_event(self, event):
         self.cur_pos = event.x, event.y
@@ -105,14 +148,15 @@ class Graph(Gtk.DrawingArea):
 
     def do_leave_notify_event(self, event):
         self.cur_pos = None
-        self.cur_time = -1
-        self.cur_value = -1
+        self._set_cur_time_value(-1, -1)
         self.queue_draw()
+
+    def do_button_press_event(self, event):
+        self.paused = not self.paused
 
     def do_draw(self, cr):
         cr.save()
-        with self.freeze_notify():
-            self._draw(cr)
+        self._draw(cr)
         cr.restore()
 
     def _draw(self, cr):
@@ -133,19 +177,19 @@ class Graph(Gtk.DrawingArea):
             cr.move_to(x + 0.5, 0)
             cr.line_to(x + 0.5, h)
             cr.stroke()
-            self.cur_time = -1
-            self.cur_value = -1
 
-        n = len(self.data)
+        n = len(self.visible_data)
         if not n:
+            if self.cur_pos:
+                self._set_cur_time_value(-1, -1)
             return
 
         # approach 2: draw the graph from right to left, discarding data if it no longer fits
-        scale = max(self.data) or 1
+        scale = max(self.visible_data) or 1
         dx = 1 / self.zoom
         dy = float(max(1, h - 10)) / scale
-        n = min(len(self.data), int(w * self.zoom + 1))
-        points = self._points(w - n * dx + 1, h, dx, -dy, slice(-n, None))
+        n = min(len(self.visible_data), int(w * self.zoom + 1))
+        points = self._points(w - n * dx + 1, h, dx, -dy, self.visible_data[-n:])
 
         # color stolen from virt-manager
         if self.paused:
@@ -156,21 +200,20 @@ class Graph(Gtk.DrawingArea):
         self._line(cr, points)
         cr.stroke()
 
-        if self.cur_pos and self.time:
+        if self.cur_pos and self.visible_time:
             x, y = self.cur_pos
             distance_from_right = (w - x)
-            time = self.time - distance_from_right * self.zoom * self.interval * 0.001
+            time = self.visible_time - distance_from_right * self.zoom * self.interval * 0.001
             idx = -int(distance_from_right / dx) - 1
-            self.cur_time = time
             try:
-                value = self.data[idx]
+                value = self.visible_data[idx]
             except IndexError:
-                pass
+                value = -1
             else:
-                self.cur_value = value
                 cr.set_line_width(1)
                 cr.arc(points[idx][0] + 0.5, points[idx][1], 2, 0, 2 * math.pi)
                 cr.fill()
+            self._set_cur_time_value(time, value)
 
         if self.paused:
             cr.set_source_rgba(0.854902, 0.945098, 0.8627451, .5)
@@ -181,9 +224,9 @@ class Graph(Gtk.DrawingArea):
         cr.line_to(points[0][0], h)
         cr.fill()
 
-    def _points(self, x0, y0, dx, dy, slice=slice(None)):
+    def _points(self, x0, y0, dx, dy, data):
         pts = []
-        for i, pt in enumerate(self.data[slice]):
+        for i, pt in enumerate(data):
             pts.append((x0 + i * dx, y0 + pt * dy))
         return pts
 
@@ -213,8 +256,11 @@ class ProcessGraph(Gtk.VBox):
         f.add(self.graph)
         self.pack_start(f, True, True, 0)
         b = Gtk.HBox()
-        self.cur_value_label = Gtk.Label('', xalign=0.0)
+        self.cur_value_label = Gtk.Label('', xalign=0.0,
+                                         ellipsize=Pango.EllipsizeMode.END)
         self.graph.connect("notify::cur-value", self.cur_value_changed)
+        self.graph.connect("notify::paused", self.cur_value_changed)
+        self.graph.connect("notify::terminated", self.cur_value_changed)
         b.pack_start(self.cur_value_label, True, True, 0)
         self.size_label = Gtk.Label('', xalign=1.0)
         b.pack_end(self.size_label, True, True, 0)
@@ -252,6 +298,7 @@ class ProcessGraph(Gtk.VBox):
         value = get_mem_usage(self.pid)
         if value is None:
             self.graph.add_point(0)
+            self.graph.terminated = True
             self.graph.paused = True
             self.emit('exited')
             return False
@@ -264,15 +311,20 @@ class ProcessGraph(Gtk.VBox):
         self.graph.add_point(value)
 
     def cur_value_changed(self, *args):
-        if self.graph.cur_time == -1:
+        if self.graph.cur_time == -1 or self.graph.visible_time is None:
             self.cur_value_label.set_label('')
             return
-        ago = self.graph.time - self.graph.cur_time
+        ago = self.graph.visible_time - self.graph.cur_time
+        when = format_time_ago(ago)
+        if self.graph.terminated:
+            when += ' before process died'
+        elif self.graph.paused:
+            when += ' before graph was paused'
         value = self.graph.cur_value
         if value == -1:
-            self.cur_value_label.set_label(format_time_ago(ago))
+            self.cur_value_label.set_label(when)
         else:
-            self.cur_value_label.set_label("%s, %s" % (format_size(value), format_time_ago(ago)))
+            self.cur_value_label.set_label("%s, %s" % (format_size(value), when))
 
     @GObject.Signal
     def exited(self):

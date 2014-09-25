@@ -45,5 +45,4 @@ Future plans
 ------------
 
 - Option to remove graphs
-- Option to pause graphs
 - Option to see RSS instead of VIRT
