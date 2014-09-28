@@ -151,7 +151,9 @@ class Graph(Gtk.DrawingArea):
         self.queue_draw()
 
     def do_button_press_event(self, event):
-        self.paused = not self.paused
+        if event.button == Gdk.BUTTON_PRIMARY:
+            self.paused = not self.paused
+            return True
 
     def do_draw(self, cr):
         cr.save()
@@ -266,6 +268,7 @@ class ProcessGraph(Gtk.VBox):
         self.pack_start(b, False, False, 0)
         self._pid = None
         self._interval = 100
+        self._stop = False
 
     @property
     def pid(self):
@@ -288,18 +291,27 @@ class ProcessGraph(Gtk.VBox):
             raise TypeError('Cannot change interval once polling is started')
         self._interval = new_value
 
+    @GObject.Property(
+        type=bool, default=True, nick='Alive')
+    def alive(self):
+        return not self.graph.terminated
+
+    def stop(self):
+        self._stop = True
+
     def _start_polling(self):
         self._start_polling = lambda: None  # don't do this again
-        self.poll()
-        GObject.timeout_add(self.interval, self.poll)
+        self._poll()
+        GObject.timeout_add(self.interval, self._poll)
 
-    def poll(self):
+    def _poll(self):
+        if self._stop:
+            return False
         value = get_mem_usage(self.pid)
         if value is None:
             self.graph.add_point(0)
             self.graph.terminated = True
-            self.graph.paused = True
-            self.emit('exited')
+            self.notify('alive')
             return False
         else:
             self.graph.add_point(value)
@@ -325,10 +337,6 @@ class ProcessGraph(Gtk.VBox):
         else:
             self.cur_value_label.set_label("%s, %s" % (format_size(value), when))
 
-    @GObject.Signal
-    def exited(self):
-        pass
-
 
 class MainWindow(Gtk.Window):
 
@@ -340,7 +348,6 @@ class MainWindow(Gtk.Window):
         super(MainWindow, self).__init__()
 
         self.exit_when_process_dies = exit_when_process_dies
-        self.dead = 0
         self.graphs = []
 
         self.connect("delete-event", Gtk.main_quit)
@@ -381,28 +388,44 @@ class MainWindow(Gtk.Window):
         w.add(self.vbox)
         self.add(w)
 
+        ui = Gtk.UIManager()
+        ui.add_ui_from_string('''
+            <ui>
+              <popup name='graph_popup'>
+                <menuitem action='remove_graph' />
+              </popup>
+            </ui>
+        ''')
+        actions = Gtk.ActionGroup('memgraphinator')
+        actions.add_actions([
+            ('remove_graph', None, "_Remove", None, "Remove this graph", self.remove_graph),
+        ])
+        ui.insert_action_group(actions)
+        self.graph_popup = ui.get_widget('/graph_popup')
+
     def watch_pid(self, pid, start_from_zero=False):
         graph = ProcessGraph()
-        graph.connect('exited', self.process_exited)
+        graph.connect('notify::alive', self.process_exited)
         self.bind_property("zoom", graph, "zoom")
         if start_from_zero:
             graph.add_point(0)
         graph.pid = pid
+        graph.connect("button-press-event", self.show_graph_popup)
         graph.show_all()
-        self.graphs.append(graph)
 
-        if self.select_button:
+        if not self.graphs:
             self.vbox.remove(self.select_button)
-            self.select_button = None
             self.zoom_out_button.set_sensitive(True)
             grow = False
         else:
             grow = True
 
+        self.graphs.append(graph)
         self.vbox.add(graph)
 
         if grow:
             w, h = self.get_size()
+            print h
             mh = self.get_max_height()
             if h < mh:
                 gh = self.graphs[0].get_allocated_height()
@@ -414,6 +437,10 @@ class MainWindow(Gtk.Window):
                     gh = 138
                 h = min(mh, h + gh)
                 self.resize(w, h)
+                print h
+
+    def get_min_height(self):
+        return 250
 
     def get_max_height(self):
         screen = self.get_screen()
@@ -441,9 +468,34 @@ class MainWindow(Gtk.Window):
 
     def process_exited(self, widget):
         if self.exit_when_process_dies:
-            self.dead += 1
-            if self.dead == len(self.graphs):
+            if not any(g.alive for g in self.graphs):
                 Gtk.main_quit()
+
+    def show_graph_popup(self, widget, event):
+        if event.button == Gdk.BUTTON_SECONDARY:
+            self.graph_popup.selected_graph = widget
+            self.graph_popup.popup(None, None, None, None, event.button, event.time)
+            return True
+
+    def remove_graph(self, action):
+        graph = self.graph_popup.selected_graph
+        self.graph_popup.selected_graph = None
+        graph.stop()
+        self.graphs.remove(graph)
+        self.vbox.remove(graph)
+        if not self.graphs:
+            self.vbox.add(self.select_button)
+            self.select_button.show_all()
+            self.zoom_out_button.set_sensitive(False)
+        else:
+            w, h = self.get_size()
+            # XXX: these hardcoded numbers are icky, how can I get gtk to
+            # compute them for me?
+            desired_h = 112 + 138 * len(self.graphs)
+            mh = self.get_max_height()
+            h = min(mh, desired_h)
+            self.resize(w, h)
+        self.process_exited(graph)
 
 
 class ProcessSelector(Gtk.Dialog):
