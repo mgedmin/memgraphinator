@@ -103,7 +103,6 @@ class Graph(Gtk.DrawingArea):
             return
         self._cur_time = time
         self._cur_value = value
-        # XXX: notifications not worky!
         self.notify("cur-time")
         self.notify("cur-value")
 
