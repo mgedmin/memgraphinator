@@ -53,3 +53,5 @@ Future plans
 - Option to see RSS instead of VIRT
 - Accurate time axis (when you suspend laptop, graph stops, but this is
   not refected in "N seconds ago" messages)
+- More efficient drawing when zoomed out (plotting every single point for 2
+  hours makes my CPU hurt)
