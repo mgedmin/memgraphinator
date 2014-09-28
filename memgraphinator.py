@@ -406,6 +406,7 @@ class MainWindow(Gtk.Window):
     def watch_pid(self, pid, start_from_zero=False):
         graph = ProcessGraph()
         graph.connect('notify::alive', self.process_exited)
+        graph.zoom = self.zoom
         self.bind_property("zoom", graph, "zoom")
         if start_from_zero:
             graph.add_point(0)
@@ -416,6 +417,8 @@ class MainWindow(Gtk.Window):
         if not self.graphs:
             self.vbox.remove(self.select_button)
             self.zoom_out_button.set_sensitive(True)
+            if self.zoom != 1.0:
+                self.zoom_in_button.set_sensitive(True)
             grow = False
         else:
             grow = True
@@ -487,6 +490,7 @@ class MainWindow(Gtk.Window):
             self.vbox.add(self.select_button)
             self.select_button.show_all()
             self.zoom_out_button.set_sensitive(False)
+            self.zoom_in_button.set_sensitive(False)
         else:
             w, h = self.get_size()
             # XXX: these hardcoded numbers are icky, how can I get gtk to
