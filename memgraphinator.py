@@ -428,7 +428,6 @@ class MainWindow(Gtk.Window):
 
         if grow:
             w, h = self.get_size()
-            print h
             mh = self.get_max_height()
             if h < mh:
                 gh = self.graphs[0].get_allocated_height()
@@ -440,7 +439,6 @@ class MainWindow(Gtk.Window):
                     gh = 138
                 h = min(mh, h + gh)
                 self.resize(w, h)
-                print h
 
     def get_min_height(self):
         return 250
