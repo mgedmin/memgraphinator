@@ -9,7 +9,7 @@ import math
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, Gtk, Gdk, Pango
+from gi.repository import GObject, GLib, Gtk, Gdk, Pango
 
 
 def list_processes():
@@ -247,7 +247,7 @@ class ProcessGraph(Gtk.VBox):
 
     def __init__(self):
         super(ProcessGraph, self).__init__(spacing=2)
-        self.label = Gtk.Label('Process', xalign=0,
+        self.label = Gtk.Label(label='Process', xalign=0,
                                ellipsize=Pango.EllipsizeMode.END)
         self.pack_start(self.label, False, False, 0)
         self.graph = Graph()
@@ -257,13 +257,13 @@ class ProcessGraph(Gtk.VBox):
         f.add(self.graph)
         self.pack_start(f, True, True, 0)
         b = Gtk.HBox()
-        self.cur_value_label = Gtk.Label('', xalign=0.0,
+        self.cur_value_label = Gtk.Label(label='', xalign=0.0,
                                          ellipsize=Pango.EllipsizeMode.END)
         self.graph.connect("notify::cur-value", self.cur_value_changed)
         self.graph.connect("notify::paused", self.cur_value_changed)
         self.graph.connect("notify::terminated", self.cur_value_changed)
         b.pack_start(self.cur_value_label, True, True, 0)
-        self.size_label = Gtk.Label('', xalign=1.0)
+        self.size_label = Gtk.Label(label='', xalign=1.0)
         b.pack_end(self.size_label, True, True, 0)
         self.pack_start(b, False, False, 0)
         self._pid = None
@@ -302,7 +302,7 @@ class ProcessGraph(Gtk.VBox):
     def _start_polling(self):
         self._start_polling = lambda: None  # don't do this again
         self._poll()
-        GObject.timeout_add(self.interval, self._poll)
+        GLib.timeout_add(self.interval, self._poll)
 
     def _poll(self):
         if self._stop:
@@ -378,7 +378,7 @@ class MainWindow(Gtk.Window):
 
         hb.pack_end(box)
 
-        self.select_button = Gtk.Button("Select a process")
+        self.select_button = Gtk.Button(label="Select a process")
         self.select_button.set_relief(Gtk.ReliefStyle.NONE)
         self.select_button.connect("clicked", self.select_process)
 
@@ -388,20 +388,11 @@ class MainWindow(Gtk.Window):
         w.add(self.vbox)
         self.add(w)
 
-        ui = Gtk.UIManager()
-        ui.add_ui_from_string('''
-            <ui>
-              <popup name='graph_popup'>
-                <menuitem action='remove_graph' />
-              </popup>
-            </ui>
-        ''')
-        actions = Gtk.ActionGroup('memgraphinator')
-        actions.add_actions([
-            ('remove_graph', None, "_Remove", None, "Remove this graph", self.remove_graph),
-        ])
-        ui.insert_action_group(actions)
-        self.graph_popup = ui.get_widget('/graph_popup')
+        self.graph_popup = Gtk.Menu()
+        remove_graph = Gtk.MenuItem.new_with_mnemonic(label="_Remove")
+        remove_graph.connect("activate", self.remove_graph)
+        self.graph_popup.append(remove_graph)
+        self.graph_popup.show_all()
 
     def watch_pid(self, pid, start_from_zero=False):
         graph = ProcessGraph()
@@ -513,14 +504,12 @@ class ProcessSelector(Gtk.Dialog):
         if self.use_header_bar:
             kwargs['use_header_bar'] = True
         super(ProcessSelector, self).__init__(
-            "Select a process", parent=parent,
-            flags=Gtk.DialogFlags.MODAL,
-            buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                     Gtk.STOCK_OK, Gtk.ResponseType.OK),
+            title="Select a process", transient_for=parent,
             **kwargs)
         self.set_default_size(600, 400)
         self.set_border_width(6)
-        ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
+        self.add_button(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL)
+        ok_button = self.add_button(Gtk.STOCK_OK, Gtk.ResponseType.OK)
         ok_button.get_style_context().add_class("suggested-action")
         area = self.get_content_area()
         self.store = Gtk.ListStore(*self.Column.types)
@@ -550,14 +539,11 @@ class ProcessSelector(Gtk.Dialog):
         f = Gtk.Frame()
         f.add(w)
         area.pack_start(f, True, True, 0)
-        if self.use_header_bar:
-            area.show_all()
-            area = self.get_action_area()
         self.show_all_checkbox = Gtk.CheckButton(label='Show processes belonging to all users')
         self.show_all_checkbox.connect('toggled', self.show_all_toggled)
         area.pack_start(self.show_all_checkbox, False, False, 6)
         area.show_all()
-        GObject.idle_add(self.refresh_process_list)
+        GLib.idle_add(self.refresh_process_list)
 
     @property
     def pid(self):
