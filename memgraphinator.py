@@ -502,16 +502,22 @@ class MainWindow(Gtk.Window):
 
 class ProcessSelector(Gtk.Dialog):
 
+    use_header_bar = hasattr(Gtk.DialogFlags, 'USE_HEADER_BAR')
+
     class Column:
         types = (int, str, int, str, bool)
         PID, COMMAND, SIZE, SIZE_TEXT, MINE = range(len(types))
 
     def __init__(self, parent):
+        kwargs = {}
+        if self.use_header_bar:
+            kwargs['use_header_bar'] = True
         super(ProcessSelector, self).__init__(
             "Select a process", parent=parent,
-            flags=Gtk.DialogFlags.MODAL, use_header_bar=True,
+            flags=Gtk.DialogFlags.MODAL,
             buttons=(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-                     Gtk.STOCK_OK, Gtk.ResponseType.OK))
+                     Gtk.STOCK_OK, Gtk.ResponseType.OK),
+            **kwargs)
         self.set_default_size(600, 400)
         self.set_border_width(6)
         ok_button = self.get_widget_for_response(Gtk.ResponseType.OK)
@@ -544,8 +550,9 @@ class ProcessSelector(Gtk.Dialog):
         f = Gtk.Frame()
         f.add(w)
         area.pack_start(f, True, True, 0)
-        area.show_all()
-        area = self.get_action_area()
+        if self.use_header_bar:
+            area.show_all()
+            area = self.get_action_area()
         self.show_all_checkbox = Gtk.CheckButton(label='Show processes belonging to all users')
         self.show_all_checkbox.connect('toggled', self.show_all_toggled)
         area.pack_start(self.show_all_checkbox, False, False, 6)
