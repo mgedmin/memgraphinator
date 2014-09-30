@@ -36,14 +36,12 @@ Requirements
 
 - Python
 
-- PyGObject with GIR libraries for Gtk etc.
+- PyGObject with GIR libraries for GTK etc.
 
-- A reasonably new Gtk+ (with header bars etc., which I think means 3.12)
+.. note:: On Ubuntu be sure to
+          ``apt-get install python-gi python-gi-cairo git1.2-gtk-3``
 
-.. note:: Ubuntu 14.04 LTS is too old, unless you enable the unstable
-          `GNOME 3 staging PPA`_.
-
-.. _GNOME 3 staging PPA: https://launchpad.net/~gnome3-team/+archive/ubuntu/gnome3-staging
+- A reasonably new GTK+ (3.10 is fine but 3.12 is preferred)
 
 
 Future plans
