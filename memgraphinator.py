@@ -467,7 +467,7 @@ class MainWindow(Gtk.Window):
                 self.watch_pid(pid)
         process_selector_dialog.destroy()
 
-    def process_exited(self, widget):
+    def process_exited(self, *args):
         if self.exit_when_process_dies:
             if not any(g.alive for g in self.graphs):
                 Gtk.main_quit()
@@ -497,7 +497,7 @@ class MainWindow(Gtk.Window):
             mh = self.get_max_height()
             h = min(mh, desired_h)
             self.resize(w, h)
-        self.process_exited(graph)
+        self.process_exited()
 
 
 class ProcessSelector(Gtk.Dialog):
