@@ -21,12 +21,12 @@ def list_processes():
 def get_command_line(pid):
     try:
         with open('/proc/%d/cmdline' % pid, 'rb') as f:
-            cmdline = f.read().replace('\0', ' ')
+            cmdline = f.read().replace(b'\0', b' ')
         if not cmdline:
             with open('/proc/%d/stat' % pid, 'rb') as f:
                 stat = f.read()
-                cmdline = stat.partition('(')[-1].rpartition(')')[0]
-        return cmdline
+                cmdline = stat.partition(b'(')[-1].rpartition(b')')[0]
+        return cmdline.decode('UTF-8', 'replace')
     except IOError:
         return None
 
@@ -49,7 +49,7 @@ def get_mem_usage(pid):
 
 
 def format_size(size):
-    return '{:,} MB'.format(size / 1024)
+    return '{:,} MB'.format(size // 1024)
 
 
 def format_time_ago(seconds):
