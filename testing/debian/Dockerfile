@@ -35,10 +35,8 @@ ENV HOME /root
 # (WARNING **: Couldn't connect to accessibility bus: Failed to connect to socket /tmp/dbus-dw0fOAy4vj: Connection refused)
 ENV NO_AT_BRIDGE 1
 
-ENV DEBIAN_FRONTEND noninteractive
-
 RUN apt-get update \
- && apt-get install -y --no-install-recommends \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         gnome-themes-standard gnome-icon-theme gnome-icon-theme-symbolic \
         libcanberra-gtk3-module \
         python-gobject python-gi-cairo gir1.2-gtk-3.0
