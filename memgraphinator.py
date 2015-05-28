@@ -338,6 +338,21 @@ class ProcessGraph(Gtk.VBox):
             self.cur_value_label.set_label("%s, %s" % (format_size(value), when))
 
 
+def _scrollable(widget):
+    """Wrap widget in a Gtk.ScrolledWindow()."""
+    w = Gtk.ScrolledWindow()
+    w.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    w.add(widget)
+    return w
+
+
+def _framed(widget):
+    """Wrap widget in a Gtk.Frame()."""
+    frame = Gtk.Frame()
+    frame.add(widget)
+    return frame
+
+
 class MainWindow(Gtk.Window):
 
     zoom = GObject.Property(
@@ -508,42 +523,50 @@ class ProcessSelector(Gtk.Dialog):
             **kwargs)
         self.set_default_size(600, 400)
         self.set_border_width(6)
-        self.add_button("Cancel", Gtk.ResponseType.CANCEL)
-        ok_button = self.add_button("Select", Gtk.ResponseType.OK)
-        ok_button.get_style_context().add_class("suggested-action")
-        area = self.get_content_area()
+        self._init_buttons()
+
         self.store = Gtk.ListStore(*self.Column.types)
         self.filter_model = Gtk.TreeModelFilter(child_model=self.store)
         self.filter_model.set_visible_func(self.is_process_visible)
         self.sort_model = Gtk.TreeModelSort(model=self.filter_model)
-        self.process_list = Gtk.TreeView(model=self.sort_model)
-        self.process_list.set_search_column(self.Column.COMMAND)
+
+        self.process_list = self._make_process_list(self.sort_model)
+        self.process_list.connect("row_activated", self.select_process)
+        self.show_all_checkbox = Gtk.CheckButton(
+            label='Show processes belonging to all users')
+        self.show_all_checkbox.connect('toggled', self.show_all_toggled)
+
+        area = self.get_content_area()
+        area.pack_start(_framed(_scrollable(self.process_list)),
+                        expand=True, fill=True, padding=0)
+        area.pack_start(self.show_all_checkbox,
+                        expand=False, fill=False, padding=6)
+        area.show_all()
+        GLib.idle_add(self.refresh_process_list)
+
+    def _init_buttons(self):
+        self.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        ok_button = self.add_button("Select", Gtk.ResponseType.OK)
+        ok_button.get_style_context().add_class("suggested-action")
+
+    def _make_process_list(self, model):
+        process_list = Gtk.TreeView(model=model)
+        process_list.set_search_column(self.Column.COMMAND)
         column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0),
                                     text=self.Column.PID)
         column.set_sort_column_id(self.Column.PID)
-        self.process_list.append_column(column)
+        process_list.append_column(column)
         column = Gtk.TreeViewColumn("Command",
                                     Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END),
                                     text=self.Column.COMMAND)
         column.set_sort_column_id(self.Column.COMMAND)
         column.set_expand(True)
-        self.process_list.append_column(column)
+        process_list.append_column(column)
         column = Gtk.TreeViewColumn("Size", Gtk.CellRendererText(xalign=1.0),
                                     text=self.Column.SIZE_TEXT)
         column.set_sort_column_id(self.Column.SIZE)
-        self.process_list.append_column(column)
-        self.process_list.connect("row_activated", self.select_process)
-        w = Gtk.ScrolledWindow()
-        w.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        w.add(self.process_list)
-        f = Gtk.Frame()
-        f.add(w)
-        area.pack_start(f, True, True, 0)
-        self.show_all_checkbox = Gtk.CheckButton(label='Show processes belonging to all users')
-        self.show_all_checkbox.connect('toggled', self.show_all_toggled)
-        area.pack_start(self.show_all_checkbox, False, False, 6)
-        area.show_all()
-        GLib.idle_add(self.refresh_process_list)
+        process_list.append_column(column)
+        return process_list
 
     @property
     def pid(self):
@@ -575,7 +598,7 @@ class ProcessSelector(Gtk.Dialog):
                 # indicate a kernel thread (and we're not interested in those)
                 continue
             size_mb = format_size(size)
-            mine = owner == my_uid
+            mine = (owner == my_uid)
             self.store.append([pid, cmdline, size, size_mb, mine])
 
 
