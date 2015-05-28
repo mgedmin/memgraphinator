@@ -6,6 +6,7 @@ import argparse
 import subprocess
 import time
 import math
+from collections import namedtuple
 
 import gi
 gi.require_version('Gtk', '3.0')
@@ -38,14 +39,22 @@ def get_owner(pid):
         return None
 
 
+MemoryUsage = namedtuple('MemoryUsage', 'virt, rss')
+MemoryUsage.zero = MemoryUsage(0, 0)
+
+
 def get_mem_usage(pid):
+    virt = rss = None
     try:
         with open('/proc/%d/status' % pid) as fp:
             for line in fp:
                 if line.startswith('VmSize:'):
-                    return int(line.split()[1])
+                    virt = int(line.split()[1])
+                elif line.startswith('VmRSS:'):
+                    rss = int(line.split()[1])
     except IOError:
-        return None
+        pass
+    return MemoryUsage(virt, rss)
 
 
 def format_size(size):
@@ -65,6 +74,16 @@ def format_time_ago(seconds):
 
 
 class Graph(Gtk.DrawingArea):
+
+    # color stolen from virt-manager
+    VIRT_COLOR = (0.421875, 0.640625, 0.73046875)
+    VIRT_COLOR_PAUSED = (0.421875, 0.73046875, 0.4705882)
+    VIRT_FILL = (0.71484375, 0.84765625, 0.89453125, .5)
+    VIRT_FILL_PAUSED = (0.854902, 0.945098, 0.8627451, .5)
+    RSS_COLOR = (0.73046875, 0.421875, 0.640625)
+    RSS_COLOR_PAUSED = (0.4705882, 0.421875, 0.73046875)
+    RSS_FILL = (0.89453125, 0.71484375, 0.84765625, .5)
+    RSS_FILL_PAUSED = (0.8627451, 0.854902, 0.945098, .5)
 
     interval = GObject.Property(
         type=int, default=100, minimum=1, nick='Update interval (ms)')
@@ -185,50 +204,66 @@ class Graph(Gtk.DrawingArea):
                 self._set_cur_time_value(-1, -1)
             return
 
-        # approach 2: draw the graph from right to left, discarding data if it no longer fits
-        scale = max(self.visible_data) or 1
+        if self.paused:
+            virt_color, virt_fill = self.VIRT_COLOR_PAUSED, self.VIRT_FILL_PAUSED
+            rss_color, rss_fill = self.RSS_COLOR_PAUSED, self.RSS_FILL_PAUSED
+        else:
+            virt_color, virt_fill = self.VIRT_COLOR, self.VIRT_FILL
+            rss_color, rss_fill = self.RSS_COLOR, self.RSS_FILL
+
+        # draw the graph from right to left, discarding data if it no longer fits
+        scale = max(max(pt) for pt in self.visible_data) or 1
         dx = 1 / self.zoom
         dy = float(max(1, h - 10)) / scale
         n = min(len(self.visible_data), int(w * self.zoom + 1))
-        points = self._points(w - n * dx + 1, h, dx, -dy, self.visible_data[-n:])
 
-        # color stolen from virt-manager
-        if self.paused:
-            cr.set_source_rgb(0.421875, 0.73046875, 0.4705882)
-        else:
-            cr.set_source_rgb(0.421875, 0.640625, 0.73046875)
         cr.set_line_width(1)
-        self._line(cr, points)
+
+        # VIRT
+        virt_points = self._points(w - n * dx + 1, h, dx, -dy, self.visible_data[-n:],
+                                   MemoryUsage._fields.index('virt'))
+        cr.set_source_rgba(*virt_fill)
+        self._polygon(cr, virt_points, h)
+        cr.fill()
+        cr.set_source_rgb(*virt_color)
+        self._line(cr, virt_points)
         cr.stroke()
 
+        # RSS
+        rss_points = self._points(w - n * dx + 1, h, dx, -dy, self.visible_data[-n:],
+                                  MemoryUsage._fields.index('rss'))
+        cr.set_source_rgba(*rss_fill)
+        self._polygon(cr, rss_points, h)
+        cr.fill()
+        cr.set_source_rgb(*rss_color)
+        self._line(cr, rss_points)
+        cr.stroke()
+
+        # Current position
         if self.cur_pos and self.visible_time:
             x, y = self.cur_pos
             distance_from_right = (w - x)
             time = self.visible_time - distance_from_right * self.zoom * self.interval * 0.001
             idx = -int(distance_from_right / dx) - 1
             try:
-                value = self.visible_data[idx]
+                point = self.visible_data[idx]
+                value = point.virt
             except IndexError:
                 value = -1
             else:
                 cr.set_line_width(1)
-                cr.arc(points[idx][0] + 0.5, points[idx][1], 2, 0, 2 * math.pi)
+                cr.set_source_rgb(*virt_color)
+                cr.arc(virt_points[idx][0] + 0.5, virt_points[idx][1], 2, 0, 2 * math.pi)
+                cr.fill()
+                cr.set_source_rgb(*rss_color)
+                cr.arc(rss_points[idx][0] + 0.5, rss_points[idx][1], 2, 0, 2 * math.pi)
                 cr.fill()
             self._set_cur_time_value(time, value)
 
-        if self.paused:
-            cr.set_source_rgba(0.854902, 0.945098, 0.8627451, .5)
-        else:
-            cr.set_source_rgba(0.71484375, 0.84765625, 0.89453125, .5)
-        self._line(cr, points)
-        cr.line_to(points[-1][0], h)
-        cr.line_to(points[0][0], h)
-        cr.fill()
-
-    def _points(self, x0, y0, dx, dy, data):
+    def _points(self, x0, y0, dx, dy, data, idx):
         pts = []
         for i, pt in enumerate(data):
-            pts.append((x0 + i * dx, y0 + pt * dy))
+            pts.append((x0 + i * dx, y0 + pt[idx] * dy))
         return pts
 
     def _line(self, cr, points):
@@ -237,6 +272,11 @@ class Graph(Gtk.DrawingArea):
                 cr.move_to(x, y)
             else:
                 cr.line_to(x, y)
+
+    def _polygon(self, cr, points, h):
+        self._line(cr, points)
+        cr.line_to(points[-1][0], h)
+        cr.line_to(points[0][0], h)
 
 
 class ProcessGraph(Gtk.VBox):
@@ -309,13 +349,14 @@ class ProcessGraph(Gtk.VBox):
             return False
         value = get_mem_usage(self.pid)
         if value is None:
-            self.graph.add_point(0)
+            self.graph.add_point(MemoryUsage.zero)
             self.graph.terminated = True
             self.notify('alive')
             return False
         else:
             self.graph.add_point(value)
-            self.size_label.set_label(format_size(value))
+            self.size_label.set_label('{} / {}'.format(
+                format_size(value.rss), format_size(value.virt)))
             return True
 
     def add_point(self, value):
@@ -415,7 +456,7 @@ class MainWindow(Gtk.Window):
         graph.zoom = self.zoom
         self.bind_property("zoom", graph, "zoom")
         if start_from_zero:
-            graph.add_point(0)
+            graph.add_point(MemoryUsage.zero)
         graph.pid = pid
         graph.connect("button-press-event", self.show_graph_popup)
         graph.show_all()
@@ -625,7 +666,7 @@ class ProcessSelector(Gtk.Dialog):
         for pid in list_processes():
             cmdline = get_command_line(pid)
             owner = get_owner(pid)
-            size = get_mem_usage(pid)
+            size = get_mem_usage(pid).virt
             if cmdline is None or owner is None or size is None:
                 # process must've just died.  size being None might also
                 # indicate a kernel thread (and we're not interested in those)
