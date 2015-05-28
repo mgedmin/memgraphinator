@@ -529,25 +529,37 @@ class ProcessSelector(Gtk.Dialog):
         self.filter_model = Gtk.TreeModelFilter(child_model=self.store)
         self.filter_model.set_visible_func(self.is_process_visible)
         self.sort_model = Gtk.TreeModelSort(model=self.filter_model)
-
         self.process_list = self._make_process_list(self.sort_model)
         self.process_list.connect("row_activated", self.select_process)
+
         self.show_all_checkbox = Gtk.CheckButton(
             label='Show processes belonging to all users')
         self.show_all_checkbox.connect('toggled', self.show_all_toggled)
 
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.connect('search-changed', self.search)
+        self.search_bar = self._make_search_bar(self.search_entry)
+
         area = self.get_content_area()
+        area.pack_start(self.search_bar,
+                        expand=False, fill=False, padding=0)
         area.pack_start(_framed(_scrollable(self.process_list)),
                         expand=True, fill=True, padding=0)
         area.pack_start(self.show_all_checkbox,
                         expand=False, fill=False, padding=6)
         area.show_all()
+        self.connect("key-press-event", self.on_key_press)
         GLib.idle_add(self.refresh_process_list)
 
     def _init_buttons(self):
         self.add_button("Cancel", Gtk.ResponseType.CANCEL)
         ok_button = self.add_button("Select", Gtk.ResponseType.OK)
         ok_button.get_style_context().add_class("suggested-action")
+
+    def _make_search_bar(self, entry):
+        bar = Gtk.SearchBar()
+        bar.add(entry)
+        return bar
 
     def _make_process_list(self, model):
         process_list = Gtk.TreeView(model=model)
@@ -575,13 +587,34 @@ class ProcessSelector(Gtk.Dialog):
             return None
         return model[iter][self.Column.PID]
 
+    def on_key_press(self, widget, event):
+        if not self.search_entry.is_focus():
+            if self.search_entry.im_context_filter_keypress(event):
+                self.search_bar.set_search_mode(True)
+                self.search_entry.grab_focus()
+                l = self.search_entry.get_text_length()
+                self.search_entry.select_region(l, l)
+                return True
+        return False
+
     def show_all_toggled(self, widget):
         self.filter_model.refilter()
 
+    def search(self, widget):
+        self.filter_model.refilter()
+
     def is_process_visible(self, model, iter, data):
-        if self.show_all_checkbox.get_active():
-            return True
-        return model[iter][self.Column.MINE]
+        if not self.show_all_checkbox.get_active():
+            if not model[iter][self.Column.MINE]:
+                return False
+        s = self.search_entry.get_text()
+        if s:
+            if s.isdigit() and int(s) == model[iter][self.Column.PID]:
+                return True
+            if s in model[iter][self.Column.COMMAND]:
+                return True
+            return False
+        return True
 
     def select_process(self, treeview, path, view_column):
         self.response(Gtk.ResponseType.OK)
