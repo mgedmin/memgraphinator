@@ -270,8 +270,9 @@ class Graph(Gtk.DrawingArea):
 
     def _points(self, x0, y0, dx, dy, data, idx):
         pts = []
-        for i, pt in enumerate(data):
-            pts.append((x0 + i * dx, y0 + pt[idx] * dy))
+        step = max(1, int(1 / dx))
+        for i in range(0, len(data), step):
+            pts.append((x0 + i * dx, y0 + data[i][idx] * dy))
         return pts
 
     def _line(self, cr, points):
