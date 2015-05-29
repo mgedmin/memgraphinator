@@ -98,10 +98,12 @@ class Graph(Gtk.DrawingArea):
         super(Graph, self).__init__()
         self.time = None
         self.data = []
+        self.peak = 1
         self._paused = False
         self._terminated = False
         self.visible_data = self.data
         self.visible_time = None
+        self.visible_peak = None
         self.cur_pos = None
         self._cur_time = -1
         self._cur_value = MemoryUsage.invalid
@@ -158,8 +160,10 @@ class Graph(Gtk.DrawingArea):
         if value is not None:
             self.time = time.time()
             self.data.append(value)
+            self.peak = max(self.peak, value.virt)
             if not self.paused:
                 self.visible_time = self.time
+                self.visible_peak = self.peak
                 self.queue_draw()
 
     def do_motion_notify_event(self, event):
@@ -217,9 +221,8 @@ class Graph(Gtk.DrawingArea):
             rss_color, rss_fill = self.RSS_COLOR, self.RSS_FILL
 
         # draw the graph from right to left, discarding data if it no longer fits
-        scale = max(max(pt) for pt in self.visible_data) or 1
         dx = 1 / self.zoom
-        dy = float(max(1, h - 10)) / scale
+        dy = float(max(1, h - 10)) / self.visible_peak
         n = min(len(self.visible_data), int(w * self.zoom + 1))
 
         cr.set_line_width(1)
