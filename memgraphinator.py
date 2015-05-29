@@ -259,12 +259,11 @@ class Graph(Gtk.DrawingArea):
                 value = MemoryUsage.invalid
             else:
                 value = self.visible_data[idx]
-                assert abs(virt_points[idx][0] - x) < 0.5, 'error: {}, idx: {}, distance_from_right: {}'.format(virt_points[idx][0] - x, idx, distance_from_right)
                 cr.set_source_rgb(*virt_color)
-                cr.arc(virt_points[idx][0] + 0.5, virt_points[idx][1], 2, 0, 2 * math.pi)
+                cr.arc(x + 0.5, h - value.virt * dy, 2, 0, 2 * math.pi)
                 cr.fill()
                 cr.set_source_rgb(*rss_color)
-                cr.arc(rss_points[idx][0] + 0.5, rss_points[idx][1], 2, 0, 2 * math.pi)
+                cr.arc(x + 0.5, h - value.rss * dy, 2, 0, 2 * math.pi)
                 cr.fill()
             self._set_cur_time_value(time, value)
 
