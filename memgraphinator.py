@@ -41,6 +41,7 @@ def get_owner(pid):
 
 MemoryUsage = namedtuple('MemoryUsage', 'virt, rss')
 MemoryUsage.zero = MemoryUsage(0, 0)
+MemoryUsage.invalid = MemoryUsage(-1, -1)
 
 
 def get_mem_usage(pid):
@@ -84,6 +85,7 @@ class Graph(Gtk.DrawingArea):
     RSS_COLOR_PAUSED = (0.4705882, 0.421875, 0.73046875)
     RSS_FILL = (0.89453125, 0.71484375, 0.84765625, .5)
     RSS_FILL_PAUSED = (0.8627451, 0.854902, 0.945098, .5)
+    SELECTION_COLOR = (0.75, 0.75, 0.75, 0.5)
 
     interval = GObject.Property(
         type=int, default=100, minimum=1, nick='Update interval (ms)')
@@ -102,7 +104,7 @@ class Graph(Gtk.DrawingArea):
         self.visible_time = None
         self.cur_pos = None
         self._cur_time = -1
-        self._cur_value = -1
+        self._cur_value = MemoryUsage.invalid
         self.set_size_request(50, 50)
         self.add_events(Gdk.EventMask.POINTER_MOTION_MASK |
                         Gdk.EventMask.LEAVE_NOTIFY_MASK |
@@ -166,7 +168,7 @@ class Graph(Gtk.DrawingArea):
 
     def do_leave_notify_event(self, event):
         self.cur_pos = None
-        self._set_cur_time_value(-1, -1)
+        self._set_cur_time_value(-1, MemoryUsage.invalid)
         self.queue_draw()
 
     def do_button_press_event(self, event):
@@ -189,21 +191,24 @@ class Graph(Gtk.DrawingArea):
         cr.rectangle(0, 0, w, h)
         cr.fill()
 
-        # mouse position
-        if self.cur_pos:
-            x, y = self.cur_pos
-            cr.set_source_rgba(0.75, 0.75, 0.75, 0.5)
-            cr.set_line_width(1)
-            cr.move_to(x + 0.5, 0)
-            cr.line_to(x + 0.5, h)
-            cr.stroke()
-
+        # the graph
         n = len(self.visible_data)
-        if not n:
+        if n:
+            self._draw_graph(cr, w, h)
+        else:
             if self.cur_pos:
-                self._set_cur_time_value(-1, -1)
-            return
+                self._draw_cur_pos(cr, h)
+                self._set_cur_time_value(-1, MemoryUsage.invalid)
 
+    def _draw_cur_pos(self, cr, h):
+        x, y = self.cur_pos
+        cr.set_source_rgba(*self.SELECTION_COLOR)
+        cr.set_line_width(1)
+        cr.move_to(x + 0.5, 0)
+        cr.line_to(x + 0.5, h)
+        cr.stroke()
+
+    def _draw_graph(self, cr, w, h):
         if self.paused:
             virt_color, virt_fill = self.VIRT_COLOR_PAUSED, self.VIRT_FILL_PAUSED
             rss_color, rss_fill = self.RSS_COLOR_PAUSED, self.RSS_FILL_PAUSED
@@ -240,18 +245,18 @@ class Graph(Gtk.DrawingArea):
         cr.stroke()
 
         # Current position
+        if self.cur_pos:
+            self._draw_cur_pos(cr, h)
         if self.cur_pos and self.visible_time:
             x, y = self.cur_pos
             distance_from_right = (w - x)
             time = self.visible_time - distance_from_right * self.zoom * self.interval * 0.001
-            idx = -int(distance_from_right / dx) - 1
-            try:
-                point = self.visible_data[idx]
-                value = point.virt
-            except IndexError:
-                value = -1
+            idx = -int(round((distance_from_right + 1) * self.zoom))
+            if not -n <= idx < 0:
+                value = MemoryUsage.invalid
             else:
-                cr.set_line_width(1)
+                value = self.visible_data[idx]
+                assert abs(virt_points[idx][0] - x) < 0.5, 'error: {}, idx: {}, distance_from_right: {}'.format(virt_points[idx][0] - x, idx, distance_from_right)
                 cr.set_source_rgb(*virt_color)
                 cr.arc(virt_points[idx][0] + 0.5, virt_points[idx][1], 2, 0, 2 * math.pi)
                 cr.fill()
@@ -373,10 +378,12 @@ class ProcessGraph(Gtk.VBox):
         elif self.graph.paused:
             when += ' before graph was paused'
         value = self.graph.cur_value
-        if value == -1:
+        if value == MemoryUsage.invalid:
             self.cur_value_label.set_label(when)
         else:
-            self.cur_value_label.set_label("%s, %s" % (format_size(value), when))
+            self.cur_value_label.set_label("{rss} / {virt}, {when}".format(
+                rss=format_size(value.rss), virt=format_size(value.virt),
+                when=when))
 
 
 def _scrollable(widget):
