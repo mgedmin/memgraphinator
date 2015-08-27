@@ -651,6 +651,9 @@ class ProcessSelector(Gtk.Dialog):
         return model[iter][self.Column.PID]
 
     def on_key_press(self, widget, event):
+        if event.state & Gdk.ModifierType.CONTROL_MASK and Gdk.keyval_name(event.keyval) == 'f':
+            self.search_bar.set_search_mode(not self.search_bar.get_search_mode())
+            return True
         if not self.search_entry.is_focus():
             if self.search_entry.im_context_filter_keypress(event):
                 self.search_bar.set_search_mode(True)
