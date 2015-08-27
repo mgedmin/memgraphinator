@@ -590,6 +590,9 @@ class ProcessSelector(Gtk.Dialog):
         self.search_entry = Gtk.SearchEntry()
         self.search_entry.connect('search-changed', self.search)
         self.search_bar = self._make_search_bar(self.search_entry)
+        self.search_button = self._make_search_button()
+        self.search_button.bind_property("active", self.search_bar, "search-mode-enabled",
+                                         GObject.BindingFlags.BIDIRECTIONAL)
 
         area = self.get_content_area()
         area.pack_start(self.search_bar,
@@ -606,6 +609,15 @@ class ProcessSelector(Gtk.Dialog):
         self.add_button("Cancel", Gtk.ResponseType.CANCEL)
         ok_button = self.add_button("Select", Gtk.ResponseType.OK)
         ok_button.get_style_context().add_class("suggested-action")
+
+    def _make_search_button(self):
+        search_button = Gtk.ToggleButton()
+        search_button.add(Gtk.Image.new_from_icon_name("edit-find-symbolic", Gtk.IconSize.MENU))
+        search_button.set_valign(Gtk.Align.CENTER)
+        search_button.get_style_context().add_class("image-button")
+        search_button.show_all()
+        self.get_titlebar().pack_end(search_button)
+        return search_button
 
     def _make_search_bar(self, entry):
         bar = Gtk.SearchBar()
