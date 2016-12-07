@@ -55,7 +55,8 @@ def get_mem_usage(pid):
                     rss = int(line.split()[1])
     except IOError:
         pass
-    return MemoryUsage(virt, rss)
+    if virt is not None and rss is not None:
+        return MemoryUsage(virt, rss)
 
 
 def format_size(size):
