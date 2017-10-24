@@ -692,14 +692,14 @@ class ProcessSelector(Gtk.Dialog):
         for pid in list_processes():
             cmdline = get_command_line(pid)
             owner = get_owner(pid)
-            size = get_mem_usage(pid).virt
+            size = get_mem_usage(pid)
             if cmdline is None or owner is None or size is None:
                 # process must've just died.  size being None might also
                 # indicate a kernel thread (and we're not interested in those)
                 continue
-            size_mb = format_size(size)
+            size_mb = format_size(size.virt)
             mine = (owner == my_uid)
-            self.store.append([pid, cmdline, size, size_mb, mine])
+            self.store.append([pid, cmdline, size.virt, size_mb, mine])
 
 
 def main():
