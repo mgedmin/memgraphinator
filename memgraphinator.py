@@ -426,19 +426,19 @@ class MainWindow(Gtk.Window):
         hb.set_title("Memory usage")
         self.set_titlebar(hb)
 
-        button = Gtk.Button.new_from_icon_name("list-add", Gtk.IconSize.BUTTON)
+        button = Gtk.Button.new_from_icon_name("list-add-symbolic", Gtk.IconSize.BUTTON)
         button.connect("clicked", self.select_process)
         hb.pack_start(button)
 
         box = Gtk.HBox()
         box.get_style_context().add_class("linked")
 
-        self.zoom_out_button = Gtk.Button.new_from_icon_name("zoom-out", Gtk.IconSize.BUTTON)
+        self.zoom_out_button = Gtk.Button.new_from_icon_name("zoom-out-symbolic", Gtk.IconSize.BUTTON)
         self.zoom_out_button.set_sensitive(False)
         self.zoom_out_button.connect("clicked", self.zoom_out)
         box.add(self.zoom_out_button)
 
-        self.zoom_in_button = Gtk.Button.new_from_icon_name("zoom-in", Gtk.IconSize.BUTTON)
+        self.zoom_in_button = Gtk.Button.new_from_icon_name("zoom-in-symbolic", Gtk.IconSize.BUTTON)
         self.zoom_in_button.set_sensitive(False)
         self.zoom_in_button.connect("clicked", self.zoom_in)
         box.add(self.zoom_in_button)
