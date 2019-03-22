@@ -71,7 +71,7 @@ def format_time_ago(seconds):
         return '%d minutes, %d seconds ago' % (m, s)
     else:
         m, s = divmod(seconds, 60)
-        h, m = divmod(m, 24)
+        h, m = divmod(m, 60)
         return '%d hours, %d minutes, %d seconds ago' % (h, m, s)
 
 
