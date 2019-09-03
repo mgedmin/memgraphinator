@@ -10,6 +10,7 @@ from collections import namedtuple
 
 import gi
 gi.require_version('Gtk', '3.0')
+gi.require_foreign('cairo')
 from gi.repository import GObject, GLib, Gtk, Gdk, Pango  # noqa: E402
 
 
