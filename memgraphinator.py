@@ -10,7 +10,7 @@ from collections import namedtuple
 
 import gi
 gi.require_version('Gtk', '3.0')
-from gi.repository import GObject, GLib, Gtk, Gdk, Pango
+from gi.repository import GObject, GLib, Gtk, Gdk, Pango  # noqa: E402
 
 
 def list_processes():
@@ -254,7 +254,10 @@ class Graph(Gtk.DrawingArea):
         if self.cur_pos and self.visible_time:
             x, y = self.cur_pos
             distance_from_right = (w - x)
-            time = self.visible_time - distance_from_right * self.zoom * self.interval * 0.001
+            time = (
+                self.visible_time
+                - distance_from_right * self.zoom * self.interval * 0.001
+            )
             idx = -int(round((distance_from_right + 1) * self.zoom))
             if not -n <= idx < 0:
                 value = MemoryUsage.invalid
@@ -433,12 +436,14 @@ class MainWindow(Gtk.Window):
         box = Gtk.HBox()
         box.get_style_context().add_class("linked")
 
-        self.zoom_out_button = Gtk.Button.new_from_icon_name("zoom-out-symbolic", Gtk.IconSize.BUTTON)
+        self.zoom_out_button = Gtk.Button.new_from_icon_name(
+            "zoom-out-symbolic", Gtk.IconSize.BUTTON)
         self.zoom_out_button.set_sensitive(False)
         self.zoom_out_button.connect("clicked", self.zoom_out)
         box.add(self.zoom_out_button)
 
-        self.zoom_in_button = Gtk.Button.new_from_icon_name("zoom-in-symbolic", Gtk.IconSize.BUTTON)
+        self.zoom_in_button = Gtk.Button.new_from_icon_name(
+            "zoom-in-symbolic", Gtk.IconSize.BUTTON)
         self.zoom_in_button.set_sensitive(False)
         self.zoom_in_button.connect("clicked", self.zoom_in)
         box.add(self.zoom_in_button)
@@ -592,8 +597,9 @@ class ProcessSelector(Gtk.Dialog):
         self.search_entry.connect('search-changed', self.search)
         self.search_bar = self._make_search_bar(self.search_entry)
         self.search_button = self._make_search_button()
-        self.search_button.bind_property("active", self.search_bar, "search-mode-enabled",
-                                         GObject.BindingFlags.BIDIRECTIONAL)
+        self.search_button.bind_property(
+            "active", self.search_bar, "search-mode-enabled",
+            GObject.BindingFlags.BIDIRECTIONAL)
 
         area = self.get_content_area()
         area.pack_start(self.search_bar,
@@ -613,7 +619,8 @@ class ProcessSelector(Gtk.Dialog):
 
     def _make_search_button(self):
         search_button = Gtk.ToggleButton()
-        search_button.add(Gtk.Image.new_from_icon_name("edit-find-symbolic", Gtk.IconSize.MENU))
+        search_button.add(Gtk.Image.new_from_icon_name(
+            "edit-find-symbolic", Gtk.IconSize.MENU))
         search_button.set_valign(Gtk.Align.CENTER)
         search_button.get_style_context().add_class("image-button")
         search_button.show_all()
@@ -628,13 +635,15 @@ class ProcessSelector(Gtk.Dialog):
     def _make_process_list(self, model):
         process_list = Gtk.TreeView(model=model)
         process_list.set_search_column(self.Column.COMMAND)
-        column = Gtk.TreeViewColumn("PID", Gtk.CellRendererText(xalign=1.0),
-                                    text=self.Column.PID)
+        column = Gtk.TreeViewColumn(
+            "PID", Gtk.CellRendererText(xalign=1.0),
+            text=self.Column.PID)
         column.set_sort_column_id(self.Column.PID)
         process_list.append_column(column)
-        column = Gtk.TreeViewColumn("Command",
-                                    Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END),
-                                    text=self.Column.COMMAND)
+        column = Gtk.TreeViewColumn(
+            "Command",
+            Gtk.CellRendererText(ellipsize=Pango.EllipsizeMode.END),
+            text=self.Column.COMMAND)
         column.set_sort_column_id(self.Column.COMMAND)
         column.set_expand(True)
         process_list.append_column(column)
@@ -652,15 +661,16 @@ class ProcessSelector(Gtk.Dialog):
         return model[iter][self.Column.PID]
 
     def on_key_press(self, widget, event):
-        if event.state & Gdk.ModifierType.CONTROL_MASK and Gdk.keyval_name(event.keyval) == 'f':
+        if (event.state & Gdk.ModifierType.CONTROL_MASK
+                and Gdk.keyval_name(event.keyval) == 'f'):
             self.search_bar.set_search_mode(not self.search_bar.get_search_mode())
             return True
         if not self.search_entry.is_focus():
             if self.search_entry.im_context_filter_keypress(event):
                 self.search_bar.set_search_mode(True)
                 self.search_entry.grab_focus()
-                l = self.search_entry.get_text_length()
-                self.search_entry.select_region(l, l)
+                length = self.search_entry.get_text_length()
+                self.search_entry.select_region(length, length)
                 return True
         return False
 
@@ -743,7 +753,7 @@ def main():
         if child and child.poll() is None:
             print("Killing child %d" % child.pid)
             child.terminate()
-            timeout = 50 # 5 seconds
+            timeout = 50  # 5 seconds
             while child.poll() is None and timeout:
                 time.sleep(0.1)
                 timeout -= 1
@@ -751,6 +761,7 @@ def main():
                 print("Killing child %d with SIGKILL" % child.pid)
                 child.send_signal(9)
                 child.wait()
+
 
 if __name__ == '__main__':
     main()
