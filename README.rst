@@ -39,7 +39,7 @@ Requirements
 - PyGObject with GIR libraries for GTK etc.
 
 .. note:: On Ubuntu be sure to
-          ``apt-get install python-gi python-gi-cairo git1.2-gtk-3``
+          ``apt-get install python3-gi python3-gi-cairo gir1.2-gtk-3``
 
 - A reasonably new GTK+ (3.10 is fine but 3.12 is preferred)
 
