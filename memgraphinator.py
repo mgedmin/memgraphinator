@@ -539,7 +539,7 @@ class MainWindow(Gtk.Window):
     def show_graph_popup(self, widget, event):
         if event.button == Gdk.BUTTON_SECONDARY:
             self.graph_popup.selected_graph = widget
-            self.graph_popup.popup(None, None, None, None, event.button, event.time)
+            self.graph_popup.popup_at_pointer(event)
             return True
 
     def remove_graph(self, action):
