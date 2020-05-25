@@ -508,9 +508,9 @@ class MainWindow(Gtk.Window):
         return 250
 
     def get_max_height(self):
-        screen = self.get_screen()
-        return min(screen.get_monitor_geometry(n).height
-                   for n in range(screen.get_n_monitors())) - 100
+        display = Gdk.Display.get_default()
+        return min(display.get_monitor(n).get_workarea().height
+                   for n in range(display.get_n_monitors())) - 100
 
     def zoom_in(self, target):
         if self.zoom > 1.0:
